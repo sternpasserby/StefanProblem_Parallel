@@ -56,17 +56,17 @@ ic.u3 = zeros(1, Np) + 273.15 + 1;
 % Сформировать массив индексов строк в таблице с данными
 load('2021_03_30 AntarcticaBM2_parsed.mat', '-mat');
 iAr = zeros(1, numOfTasks);
-i = 1;
-while i <= numOfTasks
+i = 0;
+for j = 1:length(Data.X)
 %     if mod(i-1, 50) ~= 0
 %         continue;
 %     end
 %     x(end + 1) = Data.X(i);
-    bedrock = Data.Bedrock_m(i);
-    iceSurf = Data.Surface_m(i);
-    iceThickness = Data.IceThickness_m(i);
-    GHF = Data.GHF_Martos_mWm2(i);
-    accumRate = Data.AccumRate_kg1m2a1(i);
+    bedrock = Data.Bedrock_m(j);
+    iceSurf = Data.Surface_m(j);
+    iceThickness = Data.IceThickness_m(j);
+    GHF = Data.GHF_Martos_mWm2(j);
+    accumRate = Data.AccumRate_kg1m2a1(j);
     if bedrock > 0 && (iceSurf - iceThickness ~= bedrock) % величины должны быть целыми, так что можно не исхищряться 
         continue;
     end
@@ -76,8 +76,11 @@ while i <= numOfTasks
     if iceThickness == 0
         continue
     end
-    iAr(i) = i;
     i = i + 1;
+    if (i > numOfTasks)
+        break;
+    end
+    iAr(i) = j;
 end
 
 for k = 1:numOfRuns
