@@ -2,7 +2,7 @@ clear;
 
 wAr = 1:6;
 numOfRuns = 5;
-numOfTasks = 10;
+numOfTasks = 100;
 times = zeros(numOfRuns, length(wAr));
 %fprintf("%20s%20s\n","NumOfWorkers", "Time, sec")
 for i = 1:length(wAr)

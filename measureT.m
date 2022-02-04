@@ -73,6 +73,9 @@ while i <= numOfTasks
     if bedrock < 0 && iceSurf - iceThickness > 0
         continue;
     end
+    if iceThickness == 0
+        continue
+    end
     iAr(i) = i;
     i = i + 1;
 end
