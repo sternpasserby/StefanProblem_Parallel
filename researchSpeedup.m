@@ -2,14 +2,23 @@ clear;
 
 wAr = 1:6;
 numOfRuns = 5;
-numOfTasks = 100;
+numOfTasks = 20;
 times = zeros(numOfRuns, length(wAr));
-%fprintf("%20s%20s\n","NumOfWorkers", "Time, sec")
+delete(gcp('nocreate'));
+pool = parpool(max(wAr));
+fprintf("%20s%20s%20s\n","NumOfWorkers", "mean(Time), sec")
 for i = 1:length(wAr)
-    pool = parpool(wAr(i));
+    for j = i+1:max(wAr)
+        f(j) = parfeval(pool, @pause, 0, inf);
+    end
+%     pool = parpool(wAr(i));
     times(:, i) = measureT(pool, numOfTasks, numOfRuns)';
-    %fprintf("%20d%20.4f\n", wAr(i), times(i));
-    delete(pool);
+%     delete(pool);
+    for j = i+1:max(wAr)
+        cancel(f(j));
+    end
+    temp = memory;
+    fprintf("%20d%20.4f%20.4f\n", wAr(i), times(i));
 end
 
 figure
