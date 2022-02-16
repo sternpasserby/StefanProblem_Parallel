@@ -83,6 +83,7 @@ for j = 1:length(Data.X)
     iAr(i) = j;
 end
 
+reverseStr = '';
 for k = 1:numOfRuns
     j = 0;
     time = tic;
@@ -100,7 +101,7 @@ for k = 1:numOfRuns
         ic.accumRate = accumRate;
         bc.g0 =  @(t)(GHF/1000);
         j = j + 1;
-        F(j) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, Np, tau, tMax, 100, tauSave);
+        F(j) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
         %[s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tauSave);
         %S{end + 1} = s;
     end
@@ -114,7 +115,9 @@ for k = 1:numOfRuns
         %fprintf('Got result with index: %d.\n', completedIdx);
     end
     times(k) = toc(time);
+    msg = sprintf('Run %d/%d\n', k, numOfRuns);
+    fprintf([reverseStr, msg]);
+    reverseStr = repmat(sprintf('\b'), 1, length(msg));
 end
 
 end
-

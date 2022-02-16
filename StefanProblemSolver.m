@@ -21,12 +21,20 @@ accumRate = ic.accumRate;
 
 % Задание числа узлов на каждую фазу
 Np_min = 100;
+Np_max = 10000;
 Np1 = max(Np_min, ceil((ic.s1 - ic.s0)/h) );
 Np2 = max(Np_min, ceil((ic.s2 - ic.s1)/h) );
 Np3 = max(Np_min, ceil((ic.s3 - ic.s2)/h) );
+Np1 = min(Np_max, Np1);
+Np2 = min(Np_max, Np2);
+Np3 = min(Np_max, Np3);
 h1 = 1/(Np1 - 1);
 h2 = 1/(Np2 - 1);
 h3 = 1/(Np3 - 1);
+
+Np1
+Np2
+Np3
 
 % Задание характерных параметров для обезразмеривания
 x0 = ic.s3 - ic.s0;
