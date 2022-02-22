@@ -1,9 +1,8 @@
-function runGlacierModelling(pool, resFilename, initDataFilename, x, y)
+function runGlacierModelling(pool, resFilename, initDataFilename, pointIndices)
 %RUNGLACIERMODELLING Summary of this function goes here
 %   Detailed explanation goes here
 
 rfo = matfile('');  % Results File Object
-isPointCompleted = [];
 if isfile(resFilename)
     fprintf("File %s already exists. I am going to check it's contents.\n", resFilename);
     rfo = matfile(resFilename, 'Writable', true);
@@ -11,42 +10,25 @@ if isfile(resFilename)
         error('The specified file already contains completed computations. I will not rewrite it.')
     end
     rfo = matfile(resFilename, 'Writable', true);
-    if ~isequal(rfo.x, x)
-        error('The vector x from the file does not match your vector x');
-    end
-    if ~isequal(rfo.y, y)
-        error('The vector y from the file does not match your vector y');
+    if ~isequal(rfo.pointIndices, pointIndices)
+        error('The vector pointIndices from the file does not match your vector pointIndices');
     end
     if ~isequal(rfo.InitDataFilename, initDataFilename)
         error('The initDataFilename from the file does not match your initDataFilename');
     end
-    isPointCompleted = rfo.isPointCompleted;
+    fprintf("File %s is ok. I am going to finish computations from this file.\n", resFilename);
 else
     fprintf("File %s does not exists. I am going to create it.\n", resFilename);
-    createResultsFile(resFilename, initDataFilename, x, y);
+    createResultsFile(resFilename, initDataFilename, pointIndices);
     rfo = matfile(resFilename, 'Writable', true);
-    isPointCompleted = false(length(y), length(x));
 end
+completedPoints = rfo.completedPoints;
+numOfPoints = length(pointIndices);
 
 load(initDataFilename, 'Data');
 batchSize = pool.NumWorkers;
 
-%%% Физические константы
-pc = struct;                  % pc - problem constants, константы задачи
-pc.lambda1 = 0.6;             % Коэффициент теплопроводности воды, Вт / (м * K)
-pc.c1 = 4180.6;               % Коэффициеент удельной теплоёмкости воды, Дж / (кг * К)
-pc.rho1 = 1000;               % Плотность воды, кг/м^3
-pc.a1_sq = pc.lambda1/...     % Коэффициент температуропроводности воды, м^2/с
-    pc.c1/pc.rho1;            
-pc.lambda2 = 2.33;            % Коэффициент теплопроводности льда, Вт / (м * K)
-pc.c2 = 2110.0;               % Коэффициеент удельной теплоёмкости льда, Дж / (кг * К)
-pc.rho2 = 916.7;              % Плотность льда, кг/м^3
-pc.a2_sq = pc.lambda2/...     % Коэффициент температуропроводности льда, м^2/с
-    pc.c2/pc.rho2;            
-pc.qf = 330*1e3;              % Удельная теплота плавления льда, Дж / кг
-%pc.rho = (rho1 + rho2)/2;     % Средняя плотность
-%pc.L = 1;                     % Длина стержня, м
-pc.Uf = 273.15;               % Температура фазового перехода, К
+pc = getPhysicalConstants();
 
 %%% Смешанные краевые условия
 % Формат краевых условий:
@@ -70,7 +52,7 @@ bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимани�
 
 %%% Параметры численного решения
 Np = 1000;            % Число узлов сетки для каждой фазы
-tMax = 200*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tMax = 20*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24*30;     % Шаг по времени, с
 tauSave = 3600*24*365.25;
 
@@ -81,76 +63,61 @@ ic.s1 = 0;
 ic.s2 = 9;
 ic.s3 = 10;
 ic.u1 = zeros(1, Np) + 273.15 + 0;
-ic.u2 = zeros(1, Np) + 273.15 - 1;
+ic.u2 = zeros(1, Np) + 273.15 - 3;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-taskNumber = 0;
-ijArray = zeros(batchSize, 2);
+numOfCompletedPoints = find(completedPoints ~= 0, 1, 'last');
+if isempty(numOfCompletedPoints)
+    numOfCompletedPoints = 0;
+end
+
+for i = 1:numOfCompletedPoints
+    k = find(pointIndices == completedPoints(i, 1));
+    if ~isempty(k)
+        pointIndices(k) = [];
+    end
+end
+
+taskInd = 0;
+taskInd2pInd = zeros(batchSize, 1);
 fprintf('Progress: ');
 pb = ConsoleProgressBar();
-for i = 1:length(y)
-    for j = 1:length(x)
-        if isPointCompleted(i, j)
-            continue;
-        end
-        
-        k = find((Data.X == x(j)) & (Data.Y == y(i)));
-        if isempty(k)
-            isPointCompleted(i, j) = true;
-            rfo.isPointCompleted(i, j) = true;
-            rfo.Results(i, j) = {'There is no initial data for this point'};
-            continue;
-        end
-        
-        bedrock = Data.Bedrock_m(k);
-        iceSurf = Data.Surface_m(k);
-        iceThickness = Data.IceThickness_m(k);
-        GHF = Data.GHF_Martos_mWm2(k);
-        accumRate = Data.AccumRate_kg1m2a1(k);
-        if bedrock > 0 && (iceSurf - iceThickness ~= bedrock) % величины должны быть целыми, так что можно не исхищряться 
-            isPointCompleted(i, j) = true;
-            rfo.isPointCompleted(i, j) = true;
-            rfo.Results(i, j) = {'There is an empty space between ice and bedrock'};
-            continue;
-        end
-        if bedrock < 0 && iceSurf - iceThickness > 0
-            isPointCompleted(i, j) = true;
-            rfo.isPointCompleted(i, j) = true;
-            rfo.Results(i, j) = {'There is an empty space between ice and water at z = 0'};
-            continue;
-        end
-        if iceThickness == 0
-            isPointCompleted(i, j) = true;
-            rfo.isPointCompleted(i, j) = true;
-            rfo.Results(i, j) = {'Ice thickness is zero for this point'};
-            continue
-        end
-        
-        if taskNumber ~= batchSize
-            taskNumber = taskNumber + 1;
-            ic.s0 = bedrock;
-            ic.s1 = iceSurf - iceThickness;
-            ic.s2 = iceSurf;
-            ic.s3 = iceSurf;
-            ic.accumRate = accumRate;
-            bc.g0 =  @(t)(GHF/1000);
-            F(taskNumber) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
-            ijArray(taskNumber, :) = [i j];
-        end
-        if taskNumber == batchSize || (i == length(y) && j == length(x))
-            for k = 1:taskNumber
-                completedId = fetchNext(F);
-                iTemp = ijArray(completedId, 1);
-                jTemp = ijArray(completedId, 2);
-                rfo.Results(iTemp, jTemp) = {F(completedId).OutputArguments};
-                isPointCompleted(iTemp, jTemp) = true;
-                rfo.isPointCompleted(iTemp, jTemp) = true;
-            end
-            pb.setProgress(((i-1)*length(x) + j), (length(x)*length(y)));
-            %printProgressBar( ((i-1)*length(x) + j)/(length(x)*length(y)) );
-            taskNumber = 0;
-        end
+pb.setProgress( numOfCompletedPoints, numOfPoints );
+for i = 1:min(batchSize, length(pointIndices))
+    k = pointIndices(i);
+    ic.s0 = Data.Bedrock_m(k);
+    ic.s1 = Data.Surface_m(k) - Data.IceThickness_m(k);
+    ic.s2 = Data.Surface_m(k);
+    ic.s3 = Data.Surface_m(k);
+    ic.accumRate = Data.AccumRate_kg1m2a1(k);
+    bc.g0 =  @(t)(Data.GHF_Martos_mWm2(k)/1000);
+    F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
+    taskInd2pInd(i) = k;
+end
+
+for i = min(batchSize, length(pointIndices))+1:length(pointIndices) + batchSize
+    
+    % Получение результатов, запись их на диск
+    taskInd = fetchNext(F);
+    k = taskInd2pInd(taskInd);
+    rfo.Results(find(rfo.pointIndices == k), 1) = {F(taskInd).OutputArguments};
+    numOfCompletedPoints = numOfCompletedPoints + 1;
+    rfo.completedPoints(numOfCompletedPoints, 1) = k;
+    pb.setProgress( numOfCompletedPoints, numOfPoints );
+    
+    % Загрузка новых точек
+    if i <= length(pointIndices)
+        k = pointIndices(i);
+        ic.s0 = Data.Bedrock_m(k);
+        ic.s1 = Data.Surface_m(k) - Data.IceThickness_m(k);
+        ic.s2 = Data.Surface_m(k);
+        ic.s3 = Data.Surface_m(k);
+        ic.accumRate = Data.AccumRate_kg1m2a1(k);
+        bc.g0 =  @(t)(Data.GHF_Martos_mWm2(k)/1000);
+        F(taskInd) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
+        taskInd2pInd(taskInd) = k;
     end
+    
 end
 
 rfo.FinishDateTime = datetime();
@@ -158,17 +125,16 @@ rfo.isCompleted = true;
 
 end
 
-function createResultsFile(filename, InitDataFilename, x, y)
+function createResultsFile(filename, InitDataFilename, pointIndices)
     isCompleted = false;
-    isPointCompleted = false(length(y), length(x));
-    Results = cell(length(y), length(x));
+    completedPoints = zeros(length(pointIndices), 1);
+    Results = cell(length(pointIndices), 1);
     CreateDateTime = datetime();
     FinishDateTime = [];
     save(filename, ...
         'isCompleted', ...
-        'x', ...
-        'y', ...
-        'isPointCompleted', ...
+        'pointIndices', ...
+        'completedPoints', ...
         'Results', ...
         'CreateDateTime', ...
         'FinishDateTime', ...
@@ -176,3 +142,21 @@ function createResultsFile(filename, InitDataFilename, x, y)
         '-v7.3', '-nocompression');
 end
 
+function pc = getPhysicalConstants()
+    %%% Физические константы
+    pc = struct;                  % pc - problem constants, константы задачи
+    pc.lambda1 = 0.6;             % Коэффициент теплопроводности воды, Вт / (м * K)
+    pc.c1 = 4180.6;               % Коэффициеент удельной теплоёмкости воды, Дж / (кг * К)
+    pc.rho1 = 1000;               % Плотность воды, кг/м^3
+    pc.a1_sq = pc.lambda1/...     % Коэффициент температуропроводности воды, м^2/с
+        pc.c1/pc.rho1;            
+    pc.lambda2 = 2.33;            % Коэффициент теплопроводности льда, Вт / (м * K)
+    pc.c2 = 2110.0;               % Коэффициеент удельной теплоёмкости льда, Дж / (кг * К)
+    pc.rho2 = 916.7;              % Плотность льда, кг/м^3
+    pc.a2_sq = pc.lambda2/...     % Коэффициент температуропроводности льда, м^2/с
+        pc.c2/pc.rho2;            
+    pc.qf = 330*1e3;              % Удельная теплота плавления льда, Дж / кг
+    %pc.rho = (rho1 + rho2)/2;     % Средняя плотность
+    %pc.L = 1;                     % Длина стержня, м
+    pc.Uf = 273.15;               % Температура фазового перехода, К
+end
