@@ -2,10 +2,18 @@ function runGlacierModelling(pool, resFolderPath, initDataFilename, points_id)
 %RUNGLACIERMODELLING Summary of this function goes here
 %   Detailed explanation goes here
 
-dirName = resFolderPath + "\\Data.bin";
+partBaseName = "Data";
 numOfPoints = length(points_id);
 if isfolder(resFolderPath)
     fprintf("Folder ""%s"" already exists. Loading completed points indices.\n", resFolderPath);
+    
+    dirInfo = dir(resFolderPath + "\\*.bin");
+    numOfParts = length(dirInfo);
+    partBaseName = string( dirInfo(1).name );
+    partBaseName = extractBetween(partBaseName, 1, ...
+        strlength(partBaseName) - 4 - strlength(regexp(partBaseName,'\d*','Match')) );
+    
+    dirName = resFolderPath + "\\" + partBaseName + 1 + ".bin";
     fid = fopen(dirName, "rb");
     M = fread(fid, 1, 'int');
     fseek(fid, M*4, 0);
@@ -23,6 +31,26 @@ if isfolder(resFolderPath)
         end
     end
     fclose(fid);
+    
+    if numOfParts > 1
+        for j = 2:numOfParts
+            dirName = resFolderPath + "\\" + partBaseName + j + ".bin";
+            fid = fopen(dirName, "rb");
+            while true
+                id = fread(fid, 1, 'int');
+                if isempty(id)
+                    break;
+                else
+                    L = fread(fid, 1, 'int');
+                    completedPoints_id(i) = id;
+                    fseek(fid, 5*L*8, 0);
+                    i = i + 1;
+                end
+            end
+            fclose(fid);
+        end
+    end
+    
     completedPoints_id(i:end) = [];
     for i = 1:length(completedPoints_id)
         id = find( points_id == completedPoints_id(i), 1 );
@@ -32,8 +60,10 @@ if isfolder(resFolderPath)
     end
     numOfPoints = length(points_id);
 else
-    fprintf("Folder ""%s"" does not exists. Creating folder.\n", resFolderPath);
+    fprintf("Folder ""%s"" does not exist. Creating folder.\n", resFolderPath);
     mkdir(resFolderPath);
+    numOfParts = 1;
+    dirName = resFolderPath + "\\" + partBaseName + numOfParts + ".bin";
     fid = fopen(dirName, "wb");
     fwrite(fid, numOfPoints, 'int');
     fwrite(fid, points_id, 'int');
@@ -100,8 +130,14 @@ for i = 1:batchSize
     taskInd2pInd(i) = k;
 end
 
+maxPartSize = 1024*1024*1024;     % Размер тома в байтах
 numOfCompPoints = 0;
 for i = batchSize+1:numOfPoints + batchSize
+    dirInfo = dir(dirName);
+    if dirInfo.bytes >= maxPartSize
+        dirName = resFolderPath + "\\" + partBaseName + numOfParts + ".bin";
+        numOfParts = numOfParts + 1;
+    end
     
     % Получение результатов, запись их на диск
     taskInd = fetchNext(F);

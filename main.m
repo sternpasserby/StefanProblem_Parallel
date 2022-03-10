@@ -32,7 +32,7 @@ end
 %parentDir = "Results\\" + datestr(now, 'yy_mm_dd-HHMMSS') + "\\";
 parentDir = "Results\\";
 mkdir(parentDir);
-resFolderName = "three12";
+resFolderName = "Four22";
 runGlacierModelling(pool, parentDir + resFolderName, '2021_03_30 AntarcticaBM2_parsed.mat', points_id)
 % 
 % tMax = 200*365.25*24*3600;
