@@ -1,29 +1,45 @@
-function runGlacierModelling(pool, resFilename, initDataFilename, pointIndices)
+function runGlacierModelling(pool, resFolderPath, initDataFilename, points_id)
 %RUNGLACIERMODELLING Summary of this function goes here
 %   Detailed explanation goes here
 
-rfo = matfile('');  % Results File Object
-if isfile(resFilename)
-    fprintf("File %s already exists. I am going to check it's contents.\n", resFilename);
-    rfo = matfile(resFilename, 'Writable', true);
-    if rfo.isCompleted
-        error('The specified file already contains completed computations. I will not rewrite it.')
+dirName = resFolderPath + "\\Data.bin";
+numOfPoints = length(points_id);
+if isfolder(resFolderPath)
+    fprintf("Folder ""%s"" already exists. Loading completed points indices.\n", resFolderPath);
+    fid = fopen(dirName, "rb");
+    M = fread(fid, 1, 'int');
+    fseek(fid, M*4, 0);
+    completedPoints_id = zeros(1, M);
+    i = 1;
+    while true
+        id = fread(fid, 1, 'int');
+        if isempty(id)
+            break;
+        else
+            L = fread(fid, 1, 'int');
+            completedPoints_id(i) = id;
+            fseek(fid, 5*L*8, 0);
+            i = i + 1;
+        end
     end
-    rfo = matfile(resFilename, 'Writable', true);
-    if ~isequal(rfo.pointIndices, pointIndices)
-        error('The vector pointIndices from the file does not match your vector pointIndices');
+    fclose(fid);
+    completedPoints_id(i:end) = [];
+    for i = 1:length(completedPoints_id)
+        id = find( points_id == completedPoints_id(i), 1 );
+        if ~isempty(id)
+            points_id(id) = [];
+        end
     end
-    if ~isequal(rfo.InitDataFilename, initDataFilename)
-        error('The initDataFilename from the file does not match your initDataFilename');
-    end
-    fprintf("File %s is ok. I am going to finish computations from this file.\n", resFilename);
+    numOfPoints = length(points_id);
 else
-    fprintf("File %s does not exists. I am going to create it.\n", resFilename);
-    createResultsFile(resFilename, initDataFilename, pointIndices);
-    rfo = matfile(resFilename, 'Writable', true);
+    fprintf("Folder ""%s"" does not exists. Creating folder.\n", resFolderPath);
+    mkdir(resFolderPath);
+    fid = fopen(dirName, "wb");
+    fwrite(fid, numOfPoints, 'int');
+    fwrite(fid, points_id, 'int');
+    fclose(fid);
 end
-completedPoints = rfo.completedPoints;
-numOfPoints = length(pointIndices);
+numOfPoints = length(points_id);
 
 load(initDataFilename, 'Data');
 batchSize = pool.NumWorkers;
@@ -66,25 +82,14 @@ ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 3;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-numOfCompletedPoints = find(completedPoints ~= 0, 1, 'last');
-if isempty(numOfCompletedPoints)
-    numOfCompletedPoints = 0;
-end
-
-for i = 1:numOfCompletedPoints
-    k = find(pointIndices == completedPoints(i, 1));
-    if ~isempty(k)
-        pointIndices(k) = [];
-    end
-end
-
 taskInd = 0;
 taskInd2pInd = zeros(batchSize, 1);
+batchSize = min(batchSize, numOfPoints);
 fprintf('Progress: ');
 pb = ConsoleProgressBar();
-pb.setProgress( numOfCompletedPoints, numOfPoints );
-for i = 1:min(batchSize, length(pointIndices))
-    k = pointIndices(i);
+pb.setProgress( 0, numOfPoints );
+for i = 1:batchSize
+    k = points_id(i);
     ic.s0 = Data.Bedrock_m(k);
     ic.s1 = Data.Surface_m(k) - Data.IceThickness_m(k);
     ic.s2 = Data.Surface_m(k);
@@ -95,19 +100,28 @@ for i = 1:min(batchSize, length(pointIndices))
     taskInd2pInd(i) = k;
 end
 
-for i = min(batchSize, length(pointIndices))+1:length(pointIndices) + batchSize
+numOfCompPoints = 0;
+for i = batchSize+1:numOfPoints + batchSize
     
     % Получение результатов, запись их на диск
     taskInd = fetchNext(F);
     k = taskInd2pInd(taskInd);
-    rfo.Results(find(rfo.pointIndices == k), 1) = {F(taskInd).OutputArguments};
-    numOfCompletedPoints = numOfCompletedPoints + 1;
-    rfo.completedPoints(numOfCompletedPoints, 1) = k;
-    pb.setProgress( numOfCompletedPoints, numOfPoints );
+    fid = fopen(dirName, "ab");
+    L = length( F(taskInd).OutputArguments{2} );
+    fwrite(fid, k, 'int');
+    fwrite(fid, L, 'int');
+%     fwrite(fid, L, 'int');
+%     fwrite(fid, k*ones(5, L), 'double');
+    fwrite(fid, F(taskInd).OutputArguments{2}, 'double');
+    fwrite(fid, F(taskInd).OutputArguments{1}, 'double');
+    fclose(fid);
+    
+    numOfCompPoints = numOfCompPoints + 1;
+    pb.setProgress( numOfCompPoints, numOfPoints );
     
     % Загрузка новых точек
-    if i <= length(pointIndices)
-        k = pointIndices(i);
+    if i <= length(points_id)
+        k = points_id(i);
         ic.s0 = Data.Bedrock_m(k);
         ic.s1 = Data.Surface_m(k) - Data.IceThickness_m(k);
         ic.s2 = Data.Surface_m(k);
@@ -119,9 +133,6 @@ for i = min(batchSize, length(pointIndices))+1:length(pointIndices) + batchSize
     end
     
 end
-
-rfo.FinishDateTime = datetime();
-rfo.isCompleted = true;
 
 end
 
