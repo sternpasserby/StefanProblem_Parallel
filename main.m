@@ -17,11 +17,14 @@ for i = 1:length(Data.X)
     %GHF = Data.GHF_Martos_mWm2(i);
     %accumRate = Data.AccumRate_kg1m2a1(i);
     
-    if bedrock > 0 && (iceSurf - iceThickness ~= bedrock) % величины должны быть целыми, так что можно не исхищряться 
-        continue;
-    end
-    if bedrock < 0 && iceSurf - iceThickness > 0
-        continue;
+%     if bedrock > 0 && (iceSurf - iceThickness ~= bedrock) % величины должны быть целыми, так что можно не исхищряться 
+%         continue;
+%     end
+%     if bedrock < 0 && iceSurf - iceThickness > 0
+%         continue;
+%     end
+    if (iceSurf - iceThickness - bedrock ~= 0)
+        continue
     end
     if iceThickness == 0
         continue
@@ -32,7 +35,7 @@ end
 %parentDir = "Results\\" + datestr(now, 'yy_mm_dd-HHMMSS') + "\\";
 parentDir = "Results\\";
 mkdir(parentDir);
-resFolderName = "Four22";
+resFolderName = "One";
 runGlacierModelling(pool, parentDir + resFolderName, '2021_03_30 AntarcticaBM2_parsed.mat', points_id)
 % 
 % tMax = 200*365.25*24*3600;

@@ -70,6 +70,10 @@ else
     fclose(fid);
 end
 numOfPoints = length(points_id);
+if numOfPoints == 0
+    fprintf("No more grid points to calculate! Aborting...\n");
+    return;
+end
 
 load(initDataFilename, 'Data');
 batchSize = pool.NumWorkers;
@@ -81,57 +85,58 @@ pc = getPhysicalConstants();
 % alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
 % alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
 bc = struct;                  % bc - boundary conditions
-bc.alpha = zeros(6, 2);
-bc.alpha = [0 -pc.lambda1; 
-            1 0
-            1 0
-            1 0
-            1 0
-            1 0];
-bc.g0 = @(t)(0.05);
-bc.g1 = @(t)(pc.Uf);
-bc.g2 = @(t)(pc.Uf);
-bc.g3 = @(t)(pc.Uf);
-bc.g4 = @(t)(pc.Uf);
-bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
-%bc.g5 = @(t)(1 + 273.15);
+bc.alpha = [0 -pc.lambda1; 1 0];
 
 %%% Параметры численного решения
-Np = 1000;            % Число узлов сетки для каждой фазы
-tMax = 20*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*30;     % Шаг по времени, с
-tauSave = 3600*24*365.25;
-
-%%% Начальные условия
-ic = struct;                 % ic - initial conditions
-ic.s0 = 0;            % Начальные положения границы раздела сред, м
-ic.s1 = 0;
-ic.s2 = 9;
-ic.s3 = 10;
-ic.u1 = zeros(1, Np) + 273.15 + 0;
-ic.u2 = zeros(1, Np) + 273.15 - 3;
-ic.u3 = zeros(1, Np) + 273.15 + 1;
+Np = [500 5000 500];            % Число узлов сетки для каждой фазы
+tMax = 1000*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tau = 3600*24*365.25/3;     % Шаг по времени, с
+tauSave = 3600*24*365.25*10;
 
 taskInd = 0;
 taskInd2pInd = zeros(batchSize, 1);
 batchSize = min(batchSize, numOfPoints);
+dateStart = datetime(now,'ConvertFrom','datenum');
 fprintf('Progress: ');
 pb = ConsoleProgressBar();
 pb.setProgress( 0, numOfPoints );
 for i = 1:batchSize
     k = points_id(i);
-    ic.s0 = Data.Bedrock_m(k);
-    ic.s1 = Data.Surface_m(k) - Data.IceThickness_m(k);
-    ic.s2 = Data.Surface_m(k);
-    ic.s3 = Data.Surface_m(k);
-    ic.accumRate = Data.AccumRate_kg1m2a1(k);
-    bc.g0 =  @(t)(Data.GHF_Martos_mWm2(k)/1000);
-    F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
+
+    % Граничные условия
+    bc.g0 = @(t)(Data.GHF_Martos_mWm2(k)/1000);
+    bc.g1 = @(t)( Data.T_Average_C(k) + 0.082/(10*365.25*24*3600)*t + Data.dT_Average_C(k)*sin(2*pi*t/31556952) + 273.15);
+    %F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
+    
+    % Начальные условия
+    s = [ Data.Bedrock_m(k); Data.Surface_m(k) - Data.IceThickness_m(k); Data.Surface_m(k); Data.Surface_m(k) ];
+    x2 = linspace(s(2), s(3), Np(2));
+    Uf_adj = (273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) ));
+    u2 = linspace(Uf_adj, bc.g1(0), Np(2));
+    ic = struct('s', s, ...
+            'dsdt', zeros(4, 1), ...
+            'x1', linspace(s(1), s(2), Np(1)), ...
+            'u1', 273.15 + zeros(Np(1), 1), ...
+            'x2', x2, ...
+            'u2', u2, ...
+            'x3', linspace(s(3), s(4), Np(3)), ...
+            'u3', 273.15 + ones(Np(3), 1), ...
+            'tInit', 0);
+    
+    F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, ... 
+                                              'tau', tau, ...
+                                              'tauSave', tauSave, ...
+                                              'tMax', tMax, ...
+                                              'Np', Np,...
+                                              'gridType', 'SigmoidBased', ...
+                                              'NpSave', [100 1000 100], ...
+                                              'accumRate', Data.AccumRate_kg1m2a1(k));
     taskInd2pInd(i) = k;
 end
 
 maxPartSize = 1024*1024*1024;     % Размер тома в байтах
 numOfCompPoints = 0;
+fid = fopen(dirName, "ab");
 for i = batchSize+1:numOfPoints + batchSize
     dirInfo = dir(dirName);
     if dirInfo.bytes >= maxPartSize
@@ -142,7 +147,6 @@ for i = batchSize+1:numOfPoints + batchSize
     % Получение результатов, запись их на диск
     taskInd = fetchNext(F);
     k = taskInd2pInd(taskInd);
-    fid = fopen(dirName, "ab");
     L = length( F(taskInd).OutputArguments{2} );
     fwrite(fid, k, 'int');
     fwrite(fid, L, 'int');
@@ -150,7 +154,6 @@ for i = batchSize+1:numOfPoints + batchSize
 %     fwrite(fid, k*ones(5, L), 'double');
     fwrite(fid, F(taskInd).OutputArguments{2}, 'double');
     fwrite(fid, F(taskInd).OutputArguments{1}, 'double');
-    fclose(fid);
     
     numOfCompPoints = numOfCompPoints + 1;
     pb.setProgress( numOfCompPoints, numOfPoints );
@@ -158,35 +161,45 @@ for i = batchSize+1:numOfPoints + batchSize
     % Загрузка новых точек
     if i <= length(points_id)
         k = points_id(i);
-        ic.s0 = Data.Bedrock_m(k);
-        ic.s1 = Data.Surface_m(k) - Data.IceThickness_m(k);
-        ic.s2 = Data.Surface_m(k);
-        ic.s3 = Data.Surface_m(k);
-        ic.accumRate = Data.AccumRate_kg1m2a1(k);
-        bc.g0 =  @(t)(Data.GHF_Martos_mWm2(k)/1000);
-        F(taskInd) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
-        taskInd2pInd(taskInd) = k;
+        
+        % Граничные условия
+        bc.g0 = @(t)(Data.GHF_Martos_mWm2(k)/1000);
+        bc.g1 = @(t)( Data.T_Average_C(k) + 0.082/(10*365.25*24*3600)*t + Data.dT_Average_C(k)*sin(2*pi*t/31556952) + 273.15);
+        %F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
+        
+        % Начальные условия
+        s = [ Data.Bedrock_m(k); Data.Surface_m(k) - Data.IceThickness_m(k); Data.Surface_m(k); Data.Surface_m(k) ];
+        x2 = linspace(s(2), s(3), Np(2));
+        Uf_adj = (273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) ));
+        u2 = linspace(Uf_adj, bc.g1(0), Np(2));
+        ic = struct('s', s, ...
+                'dsdt', zeros(4, 1), ...
+                'x1', linspace(s(1), s(2), Np(1)), ...
+                'u1', 273.15 + zeros(Np(1), 1), ...
+                'x2', x2, ...
+                'u2', u2, ...
+                'x3', linspace(s(3), s(4), Np(3)), ...
+                'u3', 273.15 + ones(Np(3), 1), ...
+                'tInit', 0);
+        
+        F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, ...
+                                                  'tau', tau, ...
+                                                  'tauSave', tauSave, ...
+                                                  'tMax', tMax, ...
+                                                  'Np', Np,...
+                                                  'gridType', 'SigmoidBased', ...
+                                                  'NpSave', [100 1000 100], ...
+                                                  'accumRate', Data.AccumRate_kg1m2a1(k));
+        taskInd2pInd(i) = k;
     end
     
 end
+fclose(fid);
 
-end
+dateEnd = datetime(now,'ConvertFrom','datenum');
+fprintf("Elapsed time for glacier modelling: "); 
+disp(dateEnd - dateStart);
 
-function createResultsFile(filename, InitDataFilename, pointIndices)
-    isCompleted = false;
-    completedPoints = zeros(length(pointIndices), 1);
-    Results = cell(length(pointIndices), 1);
-    CreateDateTime = datetime();
-    FinishDateTime = [];
-    save(filename, ...
-        'isCompleted', ...
-        'pointIndices', ...
-        'completedPoints', ...
-        'Results', ...
-        'CreateDateTime', ...
-        'FinishDateTime', ...
-        'InitDataFilename', ...
-        '-v7.3', '-nocompression');
 end
 
 function pc = getPhysicalConstants()

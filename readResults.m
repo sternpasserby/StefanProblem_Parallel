@@ -1,6 +1,6 @@
 clear;
 
-folderName = "Results\three12\";
+folderName = "Results\One\";
 
 dirInfo = dir(folderName + "\\*.bin");
 numOfParts = length(dirInfo);
