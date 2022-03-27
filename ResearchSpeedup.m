@@ -5,6 +5,9 @@ numOfRuns = 2;
 numOfPoints = 20;
 resFolderPath = "temp";                                      % Папка, куда будут складываться результаты моделирования
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';    % Имя файла с исходными данными для моделирования
+if isfolder(resFolderPath)
+    rmdir(resFolderPath, 's');
+end
 
 Np = [500 5000 500];
 NpSave = [100 1000 100];
@@ -35,7 +38,7 @@ for i = 1:length(wAr)
             'NpSave', NpSave, ...
             'showInfo', false);
         times(j, i) = toc(time);
-        rmdir(resFolderPath, 's')
+        rmdir(resFolderPath, 's');
     end
 %     delete(pool);
     for j = max(wAr)-wAr(i):-1:1

@@ -1,7 +1,14 @@
 clear;
 
+initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
+Np = [500 5000 500];
+NpSave = [100 1000 100];
+tMax = 1000*365.25*24*3600;
+tau = 3600*24*365.25/3;
+tauSave = 3600*24*365.25*10;
+
 pool = gcp();
-load('2021_03_30 AntarcticaBM2_parsed.mat', 'Data');
+load(initDataFilename, 'Data');
 points_id = [];
 for i = 1:length(Data.X)
     if Data.Y(i) ~= -3000
@@ -36,36 +43,12 @@ end
 parentDir = "Results/";
 mkdir(parentDir);
 resFolderName = "One";
-runGlacierModelling(pool, parentDir + resFolderName, '2021_03_30 AntarcticaBM2_parsed.mat', points_id)
-% 
-% tMax = 200*365.25*24*3600;
-% tauSave = 3600*24*365.25;
-% load(resFilename, 'Results', 'pointIndices');
-% t = 0:tauSave:tMax;
-% S = cell(size(Results));
-% for i = 1:length(S)
-%     S{i} = interp1(Results{i}{2}, Results{i}{1}', t);
-% end
+runGlacierModelling(pool, parentDir + resFolderName, initDataFilename, points_id, ...
+    'tau', tau, ...
+    'tauSave', tauSave, ...
+    'tMax', tMax, ...
+    'Np', Np,...
+    'gridType', 'SigmoidBased', ...
+    'NpSave', NpSave, ...
+    'showInfo', true)
 
-% vid = VideoWriter("vid");
-% open(vid);
-% x = Data.X(pointIndices);
-% s = zeros(length(S), 1);
-% f = figure('WindowState','maximized');
-% for i = 1:length(t)
-%     for j = 1:length(S)
-%         s(j) = S{j}(i, 2) - S{j}(i, 1);
-%     end
-%     plot(x, s, '-o', 'LineWidth', 2);
-%     legend("Relative subglacial water level")
-%     xlabel("X, m")
-%     ylabel("Water level, m")
-%     %bar(x, s, 1);
-%     axis([-inf inf 0 1.7]);
-%     set(gca, 'FontSize', 20)
-%     drawnow();
-%     title(sprintf("Time: %12.2f year", t(i)/3600/24/365.25));
-%     frame = getframe(gcf());
-%     writeVideo(vid, frame);
-% end
-% close(vid);
