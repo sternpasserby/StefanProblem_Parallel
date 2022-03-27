@@ -1,19 +1,56 @@
-function runGlacierModelling(pool, resFolderPath, initDataFilename, points_id)
+function runGlacierModelling(pool, resFolderPath, initDataFilename, points_id, varargin)
 %RUNGLACIERMODELLING Summary of this function goes here
 %   Detailed explanation goes here
 
+%%% ПАРСИНГ ВХОДНЫХ ПАРАМЕТРОВ
+% Задание значений входных параметров по умолчанию
+defaultNp = [100 1000 100];
+defaultTau = 3600*24*14;
+defaultTMax = 20*365.25*24*3600;
+defaultGridType = 'Uniform';
+defaultNpSave = [100 200 100];
+defaultTauSave = defaultTau;
+defaultShowInfo = true;
+
+% Настройка объекта parserObj типа InputParser
+parserObj = inputParser;
+parserObj.StructExpand = false;
+addRequired(parserObj, 'pool');
+addRequired(parserObj, 'resFolderPath');
+addRequired(parserObj, 'initDataFilename');
+addRequired(parserObj, 'points_id');
+addParameter(parserObj, 'Np', defaultNp);
+addParameter(parserObj, 'tau', defaultTau);
+addParameter(parserObj, 'tMax', defaultTMax);
+addParameter(parserObj, 'gridType', defaultGridType);
+addParameter(parserObj, 'NpSave', defaultNpSave);
+addParameter(parserObj, 'tauSave', defaultTauSave);
+addParameter(parserObj, 'showInfo', defaultShowInfo);
+
+parse(parserObj, pool, resFolderPath, initDataFilename, points_id, varargin{:});
+      Np = parserObj.Results.Np;
+     tau = parserObj.Results.tau;
+    tMax = parserObj.Results.tMax;
+gridType = parserObj.Results.gridType;
+  NpSave = parserObj.Results.NpSave;
+ tauSave = parserObj.Results.tauSave;
+showInfo = parserObj.Results.showInfo;
+
+%%% Создание папки и файла для результатов (или корректировка плана по частично выполненным расчётам)
 partBaseName = "Data";
 numOfPoints = length(points_id);
 if isfolder(resFolderPath)
-    fprintf("Folder ""%s"" already exists. Loading completed points indices.\n", resFolderPath);
+    if showInfo
+        fprintf("Folder ""%s"" already exists. Loading completed points indices.\n", resFolderPath);
+    end
     
-    dirInfo = dir(resFolderPath + "\\*.bin");
+    dirInfo = dir(resFolderPath + "/*.bin");
     numOfParts = length(dirInfo);
     partBaseName = string( dirInfo(1).name );
     partBaseName = extractBetween(partBaseName, 1, ...
         strlength(partBaseName) - 4 - strlength(regexp(partBaseName,'\d*','Match')) );
     
-    dirName = resFolderPath + "\\" + partBaseName + 1 + ".bin";
+    dirName = resFolderPath + "/" + partBaseName + 1 + ".bin";
     fid = fopen(dirName, "rb");
     M = fread(fid, 1, 'int');
     fseek(fid, M*4, 0);
@@ -34,7 +71,7 @@ if isfolder(resFolderPath)
     
     if numOfParts > 1
         for j = 2:numOfParts
-            dirName = resFolderPath + "\\" + partBaseName + j + ".bin";
+            dirName = resFolderPath + "/" + partBaseName + j + ".bin";
             fid = fopen(dirName, "rb");
             while true
                 id = fread(fid, 1, 'int');
@@ -60,10 +97,12 @@ if isfolder(resFolderPath)
     end
     numOfPoints = length(points_id);
 else
-    fprintf("Folder ""%s"" does not exist. Creating folder.\n", resFolderPath);
+    if showInfo
+        fprintf("Folder ""%s"" does not exist. Creating folder.\n", resFolderPath);
+    end
     mkdir(resFolderPath);
     numOfParts = 1;
-    dirName = resFolderPath + "\\" + partBaseName + numOfParts + ".bin";
+    dirName = resFolderPath + "/" + partBaseName + numOfParts + ".bin";
     fid = fopen(dirName, "wb");
     fwrite(fid, numOfPoints, 'int');
     fwrite(fid, points_id, 'int');
@@ -71,7 +110,9 @@ else
 end
 numOfPoints = length(points_id);
 if numOfPoints == 0
-    fprintf("No more grid points to calculate! Aborting...\n");
+    if showInfo
+        fprintf("No more grid points to calculate! Aborting...\n");
+    end
     return;
 end
 
@@ -87,19 +128,15 @@ pc = getPhysicalConstants();
 bc = struct;                  % bc - boundary conditions
 bc.alpha = [0 -pc.lambda1; 1 0];
 
-%%% Параметры численного решения
-Np = [500 5000 500];            % Число узлов сетки для каждой фазы
-tMax = 1000*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*365.25/3;     % Шаг по времени, с
-tauSave = 3600*24*365.25*10;
-
 taskInd = 0;
 taskInd2pInd = zeros(batchSize, 1);
 batchSize = min(batchSize, numOfPoints);
 dateStart = datetime(now,'ConvertFrom','datenum');
-fprintf('Progress: ');
-pb = ConsoleProgressBar();
-pb.setProgress( 0, numOfPoints );
+if showInfo
+    fprintf('Progress: ');
+    pb = ConsoleProgressBar();
+    pb.setProgress( 0, numOfPoints );
+end
 for i = 1:batchSize
     k = points_id(i);
 
@@ -128,8 +165,8 @@ for i = 1:batchSize
                                               'tauSave', tauSave, ...
                                               'tMax', tMax, ...
                                               'Np', Np,...
-                                              'gridType', 'SigmoidBased', ...
-                                              'NpSave', [100 1000 100], ...
+                                              'gridType', gridType, ...
+                                              'NpSave', NpSave, ...
                                               'accumRate', Data.AccumRate_kg1m2a1(k));
     taskInd2pInd(i) = k;
 end
@@ -140,12 +177,16 @@ fid = fopen(dirName, "ab");
 for i = batchSize+1:numOfPoints + batchSize
     dirInfo = dir(dirName);
     if dirInfo.bytes >= maxPartSize
-        dirName = resFolderPath + "\\" + partBaseName + numOfParts + ".bin";
+        dirName = resFolderPath + "/" + partBaseName + numOfParts + ".bin";
         numOfParts = numOfParts + 1;
     end
     
     % Получение результатов, запись их на диск
     taskInd = fetchNext(F);
+    
+    %fprintf("Elapsed time for point %d: %6.2f sec\n%", taskInd2pInd(taskInd), ...
+    %    seconds(F(taskInd).FinishDateTime - F(taskInd).StartDateTime));
+    
     k = taskInd2pInd(taskInd);
     L = length( F(taskInd).OutputArguments{2} );
     fwrite(fid, k, 'int');
@@ -156,7 +197,9 @@ for i = batchSize+1:numOfPoints + batchSize
     fwrite(fid, F(taskInd).OutputArguments{1}, 'double');
     
     numOfCompPoints = numOfCompPoints + 1;
-    pb.setProgress( numOfCompPoints, numOfPoints );
+    if showInfo
+        pb.setProgress( numOfCompPoints, numOfPoints );
+    end
     
     % Загрузка новых точек
     if i <= length(points_id)
@@ -187,8 +230,8 @@ for i = batchSize+1:numOfPoints + batchSize
                                                   'tauSave', tauSave, ...
                                                   'tMax', tMax, ...
                                                   'Np', Np,...
-                                                  'gridType', 'SigmoidBased', ...
-                                                  'NpSave', [100 1000 100], ...
+                                                  'gridType', gridType, ...
+                                                  'NpSave', NpSave, ...
                                                   'accumRate', Data.AccumRate_kg1m2a1(k));
         taskInd2pInd(i) = k;
     end
@@ -197,8 +240,10 @@ end
 fclose(fid);
 
 dateEnd = datetime(now,'ConvertFrom','datenum');
-fprintf("Elapsed time for glacier modelling: "); 
-disp(dateEnd - dateStart);
+if showInfo
+    fprintf("Elapsed time for glacier modelling: "); 
+    disp(dateEnd - dateStart);
+end
 
 end
 

@@ -33,7 +33,7 @@ for i = 1:length(Data.X)
 end
 
 %parentDir = "Results\\" + datestr(now, 'yy_mm_dd-HHMMSS') + "\\";
-parentDir = "Results\\";
+parentDir = "Results/";
 mkdir(parentDir);
 resFolderName = "One";
 runGlacierModelling(pool, parentDir + resFolderName, '2021_03_30 AntarcticaBM2_parsed.mat', points_id)
