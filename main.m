@@ -11,12 +11,12 @@ pool = gcp();
 load(initDataFilename, 'Data');
 points_id = [];
 for i = 1:length(Data.X)
-    if Data.Y(i) ~= -3000
-        continue
-    end
-    if mod(i, 30) ~= 0
-        continue
-    end
+%     if Data.Y(i) ~= -3000
+%         continue
+%     end
+%     if mod(i, 30) ~= 0
+%         continue
+%     end
     
     bedrock = Data.Bedrock_m(i);
     iceSurf = Data.Surface_m(i);
@@ -50,5 +50,5 @@ runGlacierModelling(pool, parentDir + resFolderName, initDataFilename, points_id
     'Np', Np,...
     'gridType', 'SigmoidBased', ...
     'NpSave', NpSave, ...
-    'showInfo', true)
+    'showInfo', true);
 

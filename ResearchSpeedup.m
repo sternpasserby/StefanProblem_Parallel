@@ -9,9 +9,9 @@ if isfolder(resFolderPath)
     rmdir(resFolderPath, 's');
 end
 
-Np = [500 5000 500];
+Np = [500 2000 500];
 NpSave = [100 1000 100];
-tMax = 1000*365.25*24*3600;
+tMax = 500*365.25*24*3600;
 tau = 3600*24*365.25/3;
 tauSave = 3600*24*365.25*10;
 
@@ -19,13 +19,13 @@ points_id = getPoints_id(numOfPoints, initDataFilename);
 
 times = zeros(numOfRuns, length(wAr));
 delete(gcp('nocreate'));
-pool = parpool(max(wAr));
+%pool = parpool(max(wAr));
 fprintf("%20s%20s\n","NumOfWorkers", "mean(Time), sec")
 for i = 1:length(wAr)
-    for j = max(wAr)-wAr(i):-1:1
-        f(j) = parfeval(pool, @pause, 0, inf);
-    end
-%     pool = parpool(wAr(i));
+%     for j = max(wAr)-wAr(i):-1:1
+%         f(j) = parfeval(pool, @pause, 0, inf);
+%     end
+    pool = parpool(wAr(i));
     
     for j = 1:numOfRuns
         time = tic();
@@ -40,10 +40,10 @@ for i = 1:length(wAr)
         times(j, i) = toc(time);
         rmdir(resFolderPath, 's');
     end
-%     delete(pool);
-    for j = max(wAr)-wAr(i):-1:1
-        cancel(f(j));
-    end
+    delete(pool);
+%     for j = max(wAr)-wAr(i):-1:1
+%         cancel(f(j));
+%     end
     fprintf("%20d%20.4f\n", wAr(i), mean(times(:, i)));
 end
 

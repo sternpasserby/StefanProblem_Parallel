@@ -10,6 +10,7 @@ defaultTMax = 20*365.25*24*3600;
 defaultGridType = 'Uniform';
 defaultNpSave = [100 200 100];
 defaultTauSave = defaultTau;
+defaultmaxPartSize = 1024*1024*1024;     % Размер тома в байтах
 defaultShowInfo = true;
 
 % Настройка объекта parserObj типа InputParser
@@ -25,16 +26,18 @@ addParameter(parserObj, 'tMax', defaultTMax);
 addParameter(parserObj, 'gridType', defaultGridType);
 addParameter(parserObj, 'NpSave', defaultNpSave);
 addParameter(parserObj, 'tauSave', defaultTauSave);
+addParameter(parserObj, 'maxPartSize', defaultmaxPartSize);
 addParameter(parserObj, 'showInfo', defaultShowInfo);
 
 parse(parserObj, pool, resFolderPath, initDataFilename, points_id, varargin{:});
-      Np = parserObj.Results.Np;
-     tau = parserObj.Results.tau;
-    tMax = parserObj.Results.tMax;
-gridType = parserObj.Results.gridType;
-  NpSave = parserObj.Results.NpSave;
- tauSave = parserObj.Results.tauSave;
-showInfo = parserObj.Results.showInfo;
+         Np = parserObj.Results.Np;
+        tau = parserObj.Results.tau;
+       tMax = parserObj.Results.tMax;
+   gridType = parserObj.Results.gridType;
+     NpSave = parserObj.Results.NpSave;
+    tauSave = parserObj.Results.tauSave;
+maxPartSize = parserObj.Results.maxPartSize;
+   showInfo = parserObj.Results.showInfo;
 
 %%% Создание папки и файла для результатов (или корректировка плана по частично выполненным расчётам)
 partBaseName = "Data";
@@ -171,14 +174,16 @@ for i = 1:batchSize
     taskInd2pInd(i) = k;
 end
 
-maxPartSize = 1024*1024*1024;     % Размер тома в байтах
 numOfCompPoints = 0;
+
 fid = fopen(dirName, "ab");
 for i = batchSize+1:numOfPoints + batchSize
     dirInfo = dir(dirName);
     if dirInfo.bytes >= maxPartSize
+        fclose(fid);
         dirName = resFolderPath + "/" + partBaseName + numOfParts + ".bin";
         numOfParts = numOfParts + 1;
+        fid = fopen(dirName, "ab");
     end
     
     % Получение результатов, запись их на диск
