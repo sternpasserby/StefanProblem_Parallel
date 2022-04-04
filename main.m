@@ -3,7 +3,7 @@ clear;
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
 Np = [500 5000 500];
 NpSave = [100 1000 100];
-tMax = 1000*365.25*24*3600;
+tMax = 100*365.25*24*3600;
 tau = 3600*24*365.25/3;
 tauSave = 3600*24*365.25*10;
 
@@ -11,9 +11,9 @@ pool = gcp();
 load(initDataFilename, 'Data');
 points_id = [];
 for i = 1:length(Data.X)
-%     if Data.Y(i) ~= -3000
-%         continue
-%     end
+    if Data.Y(i) ~= -3000
+        continue
+    end
 %     if mod(i, 30) ~= 0
 %         continue
 %     end
