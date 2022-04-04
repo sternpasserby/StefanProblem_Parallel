@@ -1,6 +1,6 @@
 clear; close all;
 
-folderName = "Results\One\";
+folderName = "Results/One/";
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
 tEnd = getLastCommonTimeMoment(folderName);
 
@@ -70,7 +70,7 @@ function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilena
     S3 = zeros(numOfRows, numOfCols)*NaN;
     
     % Получение информации о томах
-    dirInfo = dir(folderName + "\\*.bin");
+    dirInfo = dir(folderName + "/*.bin");
     numOfParts = length(dirInfo);
     partBaseName = string( dirInfo(1).name );
     partBaseName = extractBetween(partBaseName, 1, ...
@@ -118,13 +118,14 @@ end
 function res = getLastCommonTimeMoment(folderName)
 
     % Получение информации о томах
-    dirInfo = dir(folderName + "\\*.bin");
+    dirInfo = dir(folderName + "/*.bin");
     numOfParts = length(dirInfo);
     partBaseName = string( dirInfo(1).name );
     partBaseName = extractBetween(partBaseName, 1, ...
         strlength(partBaseName) - 4 - strlength(regexp(partBaseName,'\d*','Match')) );
     
     readPoints = 0;
+    pb = ConsoleProgressBar();
     res = 0;
     for i = 1:numOfParts
         filename = folderName + partBaseName + i + ".bin";
@@ -151,7 +152,7 @@ function res = getLastCommonTimeMoment(folderName)
 
             readPoints = readPoints + 1;
         end
-
+        pb.setProgress( readPoints, N );
         fclose(fid);
     end
 end
