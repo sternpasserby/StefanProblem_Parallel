@@ -10,18 +10,21 @@ tEnd = getLastCommonTimeMoment(folderName);
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/tEnd*3600*24*365.25 );
 setupPlot(h, "Basal Melting Rate", "mm/year")
+caxis([0 10])
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S3End - S3)/tEnd*3600*24*365.25 );
 setupPlot(h, "Average Upper Melting Rate", "mm/year")
+caxis([0 1000])
 
 figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], S3End-S2End );
+h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
 setupPlot(h, "End Ice Thickness", "m")
 
 figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], (S3End-S2End) - (S3 - S2) );
+h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End-S1End) - (S2 - S1) );
 setupPlot(h, "Change in ice thickness", "m")
+caxis([0 500])
 
 % t = linspace(0, tEnd, 10);
 % [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
