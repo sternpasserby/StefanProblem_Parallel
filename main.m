@@ -8,6 +8,7 @@ tau = 3600*24*365.25/3;
 tauSave = 3600*24*365.25*10;
 
 pool = gcp();
+addAttachedFiles(pool, "mex_TDMA.mexw64");
 load(initDataFilename, 'Data');
 points_id = [];
 for i = 1:length(Data.X)
@@ -42,7 +43,7 @@ end
 %parentDir = "Results\\" + datestr(now, 'yy_mm_dd-HHMMSS') + "\\";
 parentDir = "Results/";
 mkdir(parentDir);
-resFolderName = "One";
+resFolderName = "Three";
 runGlacierModelling(pool, parentDir + resFolderName, initDataFilename, points_id, ...
     'tau', tau, ...
     'tauSave', tauSave, ...

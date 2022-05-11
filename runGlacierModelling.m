@@ -140,6 +140,18 @@ if showInfo
     pb = ConsoleProgressBar();
     pb.setProgress( 0, numOfPoints );
 end
+
+% Создать файл с основной информацией:
+fidInfo = fopen(fullfile(resFolderPath, 'info.txt'), 'a');
+if fid == -1
+  error('Cannot open info file.');
+end
+fprintf(fidInfo, '%-20s: %s\n', 'Init data filename', initDataFilename);
+fprintf(fidInfo, '%-20s: %d, %d, %d\n', 'Np', Np(1), Np(2), Np(3));
+fprintf(fidInfo, '%-20s: %2.20e seconds\n', 'tau', tau);
+fprintf(fidInfo, '%-20s: %s \n', 'Grid type', gridType);
+fprintf(fidInfo, '%-20s: %s\n', 'Start datetime', datestr(dateStart));
+
 for i = 1:batchSize
     k = points_id(i);
 
@@ -249,7 +261,9 @@ if showInfo
     fprintf("Elapsed time for glacier modelling: "); 
     disp(dateEnd - dateStart);
 end
-
+fprintf(fidInfo, '%-20s: %s\n', 'End datetime', datestr(dateEnd));
+fprintf(fidInfo, '%-20s: %s\n', 'Elapsed time', string(dateEnd - dateStart));
+fclose(fidInfo);
 end
 
 function pc = getPhysicalConstants()

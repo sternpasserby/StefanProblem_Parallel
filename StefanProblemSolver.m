@@ -167,9 +167,18 @@ X = zeros(nRows, nCols);
 U = zeros(nRows, nCols);
 T = zeros(nRows, nCols);
 
-A1 = sparse(Np(1));
-A2 = sparse(Np(2));
-A3 = sparse(Np(3));
+% A1 = sparse(Np(1));
+% A2 = sparse(Np(2));
+% A3 = sparse(Np(3));
+ld1 = zeros(Np(1) - 1, 1);
+ld2 = zeros(Np(2) - 1, 1);
+ld3 = zeros(Np(3) - 1, 1);
+md1 = zeros(Np(1), 1);
+md2 = zeros(Np(2), 1);
+md3 = zeros(Np(3), 1);
+ud1 = zeros(Np(1) - 1, 1);
+ud2 = zeros(Np(2) - 1, 1);
+ud3 = zeros(Np(3) - 1, 1);
 b1 = zeros(Np(1), 1);
 b2 = zeros(Np(2), 1);
 b3 = zeros(Np(3), 1);
@@ -283,9 +292,9 @@ while time <= tMax
     
     % Получение распределения тепла для первой фазы (если она есть)
     if ph1.exists
-        [A1, b1] = getSysMat(ph1.uPast, 1, tau, ph1.ksi, ph1.s, s0, ph1.dsdt, 0, ...
+        [ld1, md1, ud1, b1] = getSysMat(ph1.uPast, 1, tau, ph1.ksi, ph1.s, s0, ph1.dsdt, 0, ...
            [alpha(1, :); 1 0], g0(time), Uf_adj);
-        ph1.u = solveWithBackslash(A1, b1);
+        ph1.u = mex_TDMA(md1, ud1, ld1, b1);
     end
     
     % Получение распределения тепла для второй фазы
@@ -303,15 +312,15 @@ while time <= tMax
         alphaLower = alpha(1, :);
         gLower = g0(time);
     end
-    [A2, b2] = getSysMat(ph2.uPast, kappa, tau, ph2.ksi, ph2.s, ph1.s, ph2.dsdt, ph1.dsdt, ...
+    [ld2, md2, ud2, b2] = getSysMat(ph2.uPast, kappa, tau, ph2.ksi, ph2.s, ph1.s, ph2.dsdt, ph1.dsdt, ...
         [alphaLower; alphaUpper], gLower, gUpper);
-    ph2.u = solveWithBackslash(A2, b2);
+    ph2.u = mex_TDMA(md2, ud2, ld2, b2);
     
     % Получение распределения тепла для третьей фазы
     if ph3.exists
-        [A3, b3] = getSysMat(ph3.uPast, 1, tau, ph3.ksi, ph3.s, ph2.s, ph3.dsdt, ph2.dsdt, ...
+        [ld3, md3, ud3, b3]  = getSysMat(ph3.uPast, 1, tau, ph3.ksi, ph3.s, ph2.s, ph3.dsdt, ph2.dsdt, ...
            [1 0; alpha(2, :)], Uf, g1(time));
-        ph3.u = solveWithBackslash(A3, b3);
+        ph3.u = mex_TDMA(md3, ud3, ld3, b3);
     end
     
     % Зарождение верхней фазы
