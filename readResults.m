@@ -2,10 +2,10 @@ clear; close all;
 
 folderName = "Results/One/";
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
-%tEnd = getLastCommonTimeMoment(folderName);
+tEnd = getLastCommonTimeMoment(folderName);
 
-%[S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
-%[~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
+[S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
+[~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
 
 mkdir(folderName + "Pics");
 
