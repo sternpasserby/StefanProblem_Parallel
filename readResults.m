@@ -1,6 +1,6 @@
 clear; close all;
 
-folderName = "Results/One/";
+folderName = "Results/Three/";
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
 tEnd = getLastCommonTimeMoment(folderName);
 
@@ -49,7 +49,6 @@ function setupPlot(h, titleName, cbTitleName)
 end
 
 function savePlot(h, filename)
-    
     savefig(filename)
     print(filename, '-dpng', '-r300')
 end

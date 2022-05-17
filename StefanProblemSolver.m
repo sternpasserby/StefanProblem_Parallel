@@ -16,7 +16,7 @@ defaultIc = struct('s', [-130; -129; 1100; 1100], ...
                    'x3', ones(defaultNp(3), 1)*1100, ...
                    'u3', 273.15 + ones(defaultNp(3), 1), ...
                    'tInit', 0);
-defaultAccumRate = 85.5;
+defaultAccumRate = 0;
 defaultTau = 3600*24*14;
 defaultTMax = 20*365.25*24*3600; 
 defaultChLength = defaultIc.s(3) - defaultIc.s(2);
@@ -24,6 +24,7 @@ defaultChTemperature = pc.Uf;
 defaultGridType = 'Uniform';
 defaultNpSave = [100 200 100];
 defaultTauSave = defaultTau;
+defaultNpBoundsSave = inf;
 defaultDs = 0.01;
 defaultMinNewPhaseThickness = 1*1e-3;
 
@@ -42,6 +43,7 @@ addParameter(parserObj, 'chTemperature', defaultChTemperature);
 addParameter(parserObj, 'gridType', defaultGridType);
 addParameter(parserObj, 'NpSave', defaultNpSave);
 addParameter(parserObj, 'tauSave', defaultTauSave);
+addParameter(parserObj, 'NpBoundsSave', defaultNpBoundsSave);
 addParameter(parserObj, 'minDs', defaultDs);
 addParameter(parserObj, 'minNewPhaseThickness', defaultMinNewPhaseThickness);
 
@@ -71,6 +73,7 @@ parse(parserObj, pc, bc, varargin{:});
             gridType = parserObj.Results.gridType;
               NpSave = parserObj.Results.NpSave;
              tauSave = parserObj.Results.tauSave;
+        NpBoundsSave = parserObj.Results.NpBoundsSave;
                minDs = parserObj.Results.minDs;
 minNewPhaseThickness = parserObj.Results.minNewPhaseThickness;
          
@@ -165,7 +168,7 @@ nRows = sum(NpSave);
 nCols = min(numOfTimeSteps, ceil(tMax/tauSave) ) + 1;
 X = zeros(nRows, nCols);
 U = zeros(nRows, nCols);
-T = zeros(nRows, nCols);
+T = zeros(1, nCols);
 
 % A1 = sparse(Np(1));
 % A2 = sparse(Np(2));
@@ -221,8 +224,7 @@ numOfActualTimeSteps = 0;
 
 %tauAr = zeros(size(t));
 
-clear printProgressBar;
-tic;
+pb = ConsoleProgressBar();
 while time <= tMax
 %while n <= numOfTimeSteps + 1
     ph1.uPast = ph1.u;
@@ -351,24 +353,28 @@ while time <= tMax
     
     % Зарождение нижней фазы
     if ph2.u(1) > Uf_adj && ph2.u(2) > Uf_adj && ~ph1.exists
+        x2 = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
+        Uf_adj_ar = (273.15 - 7.43*1e-8*rho2*9.81*( ph2.s - x2)*x0)'/U0;
+        
         % Поиск номера последнего узла, который должен быть водой
         id = 1;
         for i = 1:Np(2)
-            if ph2.u(i) < Uf_adj
+            if ph2.u(i) < Uf_adj_ar(i)
                 id = i - 1;
                 break;
             end
         end
         
         % Вычисление толщины новой фазы
-        x = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
-        dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(ph2.u(1:id) - Uf_adj)*U0);
+        %x = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
+        %dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(ph2.u(1:id) - Uf_adj_ar(1:id))*U0);
+        dl = c2*rho2/qf/rho1*trapz(x2(1:id), abs(ph2.u(1:id) - Uf_adj_ar(1:id))*U0);
         
         if dl >= minNewPhaseThickness
             ph1.s = s0 + dl;
             ph1.u = ones(Np(1), 1)*Uf_adj;
             ph2.u(1:id) = Uf_adj;
-            ph2.u = interp1(x, ph2.u, ph1.s + ph2.ksi.*(ph2.s - ph1.s), 'linear', 'extrap')';
+            ph2.u = interp1(x2, ph2.u, ph1.s + ph2.ksi.*(ph2.s - ph1.s), 'linear', 'extrap')';
             ph1.exists = true;
         end
     end
@@ -411,7 +417,7 @@ while time <= tMax
     %if (saveTime <= time)
     if saveTime - time <= 1e-6*tauSave || n == numOfTimeSteps + 2
         %fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
-        printProgressBar(saveTime, tMax);
+        pb.setProgress(saveTime, tMax);
         
         %ksiSave1 = getGrid(NpSave(1));
         if ph1.exists
@@ -437,7 +443,7 @@ while time <= tMax
         end
         U(:, saveId) = [u1q; u2q; u3q];
         X(:, saveId) = [x1q'; x2q'; x3q'];
-        T(:, saveId) = ones(nRows, 1)*time;
+        T(saveId) = time;
         
         saveTime = saveTime + tauSave;
         saveId = saveId + 1;
@@ -452,15 +458,44 @@ t(id) = [];
 s(:, id) = [];
 %tauAr(id) = [];
 
+% Прореживание выходных данных для координат границ
+if ~isinf(NpBoundsSave)
+    [t, s] = reduceNumOfPointsInS(t, s, NpBoundsSave);
+end
+
 % Масшабирование к исходной размерности
 X = X*x0;
 T = T*t0;
 U = U*U0;
 s = s*x0;
 t = t*t0;
+end
 
-elapsedTime = toc;
-fprintf("Elapsed time for Stefan Problem Solver: %4.2f sec.\n", elapsedTime);
+function [tNew, sNew] = reduceNumOfPointsInS(t, s, newN)
+    N = length(t);
+    nPointsPerEvent_halved = 3; % Сколько точек выделить слева и справа на 
+                                %   событие зарождения или исчезновения фазы
+
+    % Поиск индексов, где происходит создание или вырождение фазы
+    ds1 = s(2, :) - s(1, :);
+    ds3 = s(4, :) - s(3, :);
+    idPhase = zeros(1, N);
+    k = 1;
+    for i = 2:N
+        if ( abs(ds1(i-1)) < 1e-6 && abs(ds1(i)) > 0 ) || ...
+                ( abs(ds1(i-1)) > 0 && abs(ds1(i)) < 1e-6 ) || ...
+                ( abs(ds3(i-1)) < 1e-6 && abs(ds3(i)) > 0 ) || ...
+                ( abs(ds3(i-1)) > 0  && abs(ds3(i)) < 1e-6 )
+            idI = max(i-nPointsPerEvent_halved, 1):min(i+nPointsPerEvent_halved, N);
+            idPhase( k:k+length(idI)-1 ) = idI;
+            k = k + length(idI);
+        end
+    end
+    idPhase(k:end) = [];
+    
+    id = unique([ 1, idPhase, 1:ceil(N/newN):N, N ]);
+    tNew = t(id);
+    sNew = s(:, id);
 end
 
 function xNew = reconstructGrid_uniform(Np)
@@ -528,41 +563,5 @@ function yNew = csInterp(x, y, xq, alpha, g0, g1)
     yNew = ppval(pp, xq)';
 end
 
-function printProgressBar(n, N)
-%PRINTPROGRESSBAR Summary of this function goes here
-%   Detailed explanation goes here
-
-persistent barLength;
-persistent leftSymbol;
-persistent rightSymbol;
-persistent completedSymbol;
-persistent todoSymbol;
-persistent reverseStr;
-
-fraction = n/N;
-isInit = (isempty(reverseStr) && fraction <= 1);
-if isInit
-          barLength = 25;
-         leftSymbol = '[';
-        rightSymbol = ']';
-    completedSymbol = '=';
-         todoSymbol = ' ';
-         reverseStr = '';
-end
-
-numOfSegments = floor(fraction*barLength);
-completedStr = repmat(completedSymbol, 1, numOfSegments);
-todoStr = repmat(todoSymbol, 1, barLength - numOfSegments);
-%msg = sprintf([leftSymbol completedStr todoStr  rightSymbol ' %5.2f%% (%d / %d)'], fraction*100, n, N);
-msg = sprintf(...
-    [leftSymbol ... 
-    completedStr ... 
-    todoStr ... 
-    rightSymbol, ...
-    ' %5.2f%%'], fraction*100);
-    %' %5.2f%% (%d/%d)'], fraction*100, n, N);
-disp([reverseStr msg]);
-reverseStr = repmat(sprintf('\b'), 1, length(msg)+1);
-end
 
 

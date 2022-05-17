@@ -12,6 +12,7 @@ defaultNpSave = [100 200 100];
 defaultTauSave = defaultTau;
 defaultmaxPartSize = 1024*1024*1024;     % Размер тома в байтах
 defaultShowInfo = true;
+defaultNpBoundsSave = inf;
 
 % Настройка объекта parserObj типа InputParser
 parserObj = inputParser;
@@ -28,16 +29,18 @@ addParameter(parserObj, 'NpSave', defaultNpSave);
 addParameter(parserObj, 'tauSave', defaultTauSave);
 addParameter(parserObj, 'maxPartSize', defaultmaxPartSize);
 addParameter(parserObj, 'showInfo', defaultShowInfo);
+addParameter(parserObj, 'NpBoundsSave', defaultNpBoundsSave);
 
 parse(parserObj, pool, resFolderPath, initDataFilename, points_id, varargin{:});
-         Np = parserObj.Results.Np;
-        tau = parserObj.Results.tau;
-       tMax = parserObj.Results.tMax;
-   gridType = parserObj.Results.gridType;
-     NpSave = parserObj.Results.NpSave;
-    tauSave = parserObj.Results.tauSave;
-maxPartSize = parserObj.Results.maxPartSize;
-   showInfo = parserObj.Results.showInfo;
+          Np = parserObj.Results.Np;
+         tau = parserObj.Results.tau;
+        tMax = parserObj.Results.tMax;
+    gridType = parserObj.Results.gridType;
+      NpSave = parserObj.Results.NpSave;
+     tauSave = parserObj.Results.tauSave;
+ maxPartSize = parserObj.Results.maxPartSize;
+    showInfo = parserObj.Results.showInfo;
+NpBoundsSave = parserObj.Results.NpBoundsSave;
 
 %%% Создание папки и файла для результатов (или корректировка плана по частично выполненным расчётам)
 partBaseName = "Data";
@@ -182,7 +185,8 @@ for i = 1:batchSize
                                               'Np', Np,...
                                               'gridType', gridType, ...
                                               'NpSave', NpSave, ...
-                                              'accumRate', Data.AccumRate_kg1m2a1(k));
+                                              'accumRate', Data.AccumRate_kg1m2a1(k), ...
+                                              'NpBoundsSave', NpBoundsSave);
     taskInd2pInd(i) = k;
 end
 
@@ -249,7 +253,8 @@ for i = batchSize+1:numOfPoints + batchSize
                                                   'Np', Np,...
                                                   'gridType', gridType, ...
                                                   'NpSave', NpSave, ...
-                                                  'accumRate', Data.AccumRate_kg1m2a1(k));
+                                                  'accumRate', Data.AccumRate_kg1m2a1(k), ...
+                                                  'NpBoundsSave', NpBoundsSave);
         taskInd2pInd(taskInd) = k;
     end
     

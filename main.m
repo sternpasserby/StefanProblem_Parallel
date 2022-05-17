@@ -6,18 +6,31 @@ NpSave = [100 1000 100];
 tMax = 1000*365.25*24*3600;
 tau = 3600*24*365.25/3;
 tauSave = 3600*24*365.25*10;
+NpBoundsSave = 100;
 
-pool = gcp();
-addAttachedFiles(pool, "mex_TDMA.mexa64");
+pool = gcp('nocreate');
+if isempty(pool)
+    pool = parpool(3);
+end
+
+mex -largeArrayDims mex_TDMA.cpp
+if isfile("mex_TDMA.mexw64")
+    addAttachedFiles(pool, "mex_TDMA.mexw64");
+elseif isfile("mex_TDMA.mexa64")
+    addAttachedFiles(pool, "mex_TDMA.mexa64");
+else
+    error("Can't find compiled mex file!");
+end
+    
 load(initDataFilename, 'Data');
 points_id = [];
 for i = 1:length(Data.X)
-%    if Data.Y(i) ~= -3000
-%        continue
-%    end
-%     if mod(i, 30) ~= 0
-%         continue
-%     end
+   if Data.Y(i) ~= -3000
+       continue
+   end
+    if mod(i, 30) ~= 0
+        continue
+    end
     
     bedrock = Data.Bedrock_m(i);
     iceSurf = Data.Surface_m(i);
@@ -51,5 +64,6 @@ runGlacierModelling(pool, parentDir + resFolderName, initDataFilename, points_id
     'Np', Np,...
     'gridType', 'SigmoidBased', ...
     'NpSave', NpSave, ...
-    'showInfo', true);
+    'showInfo', true, ...
+    'NpBoundsSave', NpBoundsSave);
 
