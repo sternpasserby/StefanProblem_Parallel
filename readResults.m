@@ -2,29 +2,36 @@ clear; close all;
 
 folderName = "Results/One/";
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
-tEnd = getLastCommonTimeMoment(folderName);
+%tEnd = getLastCommonTimeMoment(folderName);
 
-[S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
-[~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
+%[S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
+%[~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
+
+mkdir(folderName + "Pics");
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/tEnd*3600*24*365.25 );
 setupPlot(h, "Basal Melting Rate", "mm/year")
-caxis([0 10])
+caxis([0 15])
+savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S3End - S3)/tEnd*3600*24*365.25 );
 setupPlot(h, "Average Upper Melting Rate", "mm/year")
 caxis([0 1000])
+savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate_plusAccumulation");
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
 setupPlot(h, "End Ice Thickness", "m")
+caxis([0 inf])
+savePlot(h, folderName + "Pics/" + "EndIceThickness");
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End-S1End) - (S2 - S1) );
 setupPlot(h, "Change in ice thickness", "m")
 caxis([0 500])
+savePlot(h, folderName + "Pics/" + "ChangeInIceThickness");
 
 % t = linspace(0, tEnd, 10);
 % [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
@@ -39,6 +46,12 @@ function setupPlot(h, titleName, cbTitleName)
     title(titleName);
     cb=colorbar; cb.TickLabelInterpreter='latex'; title(cb, cbTitleName)
     axis equal
+end
+
+function savePlot(h, filename)
+    
+    savefig(filename)
+    print(filename, '-dpng', '-r300')
 end
 
 function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, time)
@@ -129,7 +142,7 @@ function res = getLastCommonTimeMoment(folderName)
     
     readPoints = 0;
     pb = ConsoleProgressBar();
-    res = 0;
+    res = inf;
     for i = 1:numOfParts
         filename = folderName + partBaseName + i + ".bin";
         if i == 1
@@ -149,7 +162,7 @@ function res = getLastCommonTimeMoment(folderName)
             t = fread(fid, [1, L], 'double');
             A = fread(fid, [4, L], 'double');
             
-            if t(end) > res
+            if t(end) < res
                 res = t(end);
             end
 
