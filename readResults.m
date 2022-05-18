@@ -1,13 +1,34 @@
 clear; close all;
 
-folderName = "Results/Three/";
+folderName = "Results/Four/";
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
-tEnd = getLastCommonTimeMoment(folderName);
+mkdir(folderName + "Pics");
 
+tEnd = getLastCommonTimeMoment(folderName);
 [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
 [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
 
-mkdir(folderName + "Pics");
+% Получение вклада аккумуляции
+load(initDataFilename, 'Data');
+dAccum = NaN*zeros(size(S0));
+dirInfo = dir(folderName + "/*.bin");
+filename = string( dirInfo(1).name );
+fid = fopen(folderName + filename, "rb");
+N = fread(fid, 1, 'int');
+points_id = fread(fid, [1, N], 'int');
+x = unique(Data.X);
+y = unique(Data.Y);
+rho2 = 916.7;
+for i = 1:N
+    id = points_id(i);
+    i1 = find( y == Data.Y(id) );
+    j1 = find( x == Data.X(id) );
+    
+    dAccum(i1, j1) = Data.AccumRate_kg1m2a1(id)/rho2/(3600*24*365.25)*tEnd;
+end
+fclose(fid);
+
+dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/tEnd*3600*24*365.25 );
@@ -15,11 +36,29 @@ setupPlot(h, "Basal Melting Rate", "mm/year")
 caxis([0 15])
 savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
 
+% vw = VideoWriter('newfile.avi');
+% vw.FrameRate = 1;
+% open(vw)
+% h = imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
+% setupPlot(h, sprintf("S3(t) - S2(t), t  = %d years", 0), "m")
+% axis tight manual 
+% set(gca,'nextplot','replacechildren'); 
+% t = linspace(0, tEnd, 20);
+% pb = ConsoleProgressBar();
+% for i = 1:length(t)
+%     [~, ~, S2, S3, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
+%     imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
+%     title( sprintf( "S3(t) - S2(t), t  = %d years", floor(t(i)/(3600*24*365.25)) ) );
+%     writeVideo(vw, getframe(gcf) );
+%     pb.setProgress( i, length(t) );
+% end
+% close(vw)
+
 figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S3End - S3)/tEnd*3600*24*365.25 );
+h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - dAccum - S3 + dH )/tEnd*3600*24*365.25 );
 setupPlot(h, "Average Upper Melting Rate", "mm/year")
-caxis([0 1000])
-savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate_plusAccumulation");
+%caxis([0 1500])
+savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
 
 figure
 h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
@@ -28,14 +67,10 @@ caxis([0 inf])
 savePlot(h, folderName + "Pics/" + "EndIceThickness");
 
 figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End-S1End) - (S2 - S1) );
-setupPlot(h, "Change in ice thickness", "m")
-caxis([0 500])
-savePlot(h, folderName + "Pics/" + "ChangeInIceThickness");
-
-% t = linspace(0, tEnd, 10);
-% [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
-% plot(S2(213, :)-S1(213, :))
+h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - dAccum - S1End) - (S2 - S1) );
+setupPlot(h, "Change in ice thickness (no accumulation)", "m")
+%caxis([0 500])
+savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
 
 function setupPlot(h, titleName, cbTitleName)
     colormap jet
