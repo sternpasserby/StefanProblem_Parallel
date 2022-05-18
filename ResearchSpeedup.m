@@ -67,15 +67,15 @@ figure
 h = plot(wAr, mean(times), '-s');
 xlabel('Number of Workers')
 ylabel('Time, sec')
-savePlot(h, "Time");
+savePlot(h, resultsFolder + "Time");
 
 figure
 h = plot(wAr, mean(times(:, 1))./mean(times), '-s');
 xlabel('Number of Workers')
 ylabel('Speedup')
-savePlot(h, "Speedup");
+savePlot(h, resultsFolder + "Speedup");
 
-save('data.mat', 'times', 'wAr', 'numOfRuns', 'numOfPoints', 'Np',...
+save(resultsFolder + 'data.mat', 'times', 'wAr', 'numOfRuns', 'numOfPoints', 'Np',...
     'NpSave', 'tMax', 'tau', 'tauSave', 'NpBoundsSave', '-mat');
 
 function savePlot(h, filename)
