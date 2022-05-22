@@ -1,5 +1,5 @@
 clear; close all;
-addpath( genpath('..\ForCoastlinePlotting') );   % Не знаю почему, но здесь одна точка (а не 2) означает подняться на один уровень
+addpath( genpath('..\ForCoastlinePlotting') ); 
 
 folderName = "Results/Four/";
 initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
@@ -23,52 +23,51 @@ fprintf("Done.\n")
 % Получение скорости аккумуляции (в м/с)
 AccumRate = getAccumulationSpeed(initDataFilename, folderName, size(S0));
 
-% 
-% fprintf("Getting phase boundaries at t = %.2f years... ", tEnd * sec2years);
-% [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
-% fprintf("Done.\n")
-% 
-% % dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
-% 
-% % Скорость донного таяния
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/(tEnd*sec2years) );
-% setupPlot(h, "Basal Melting Rate", "mm/year")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% caxis([0 15])
-% savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
-% 
-% % Скорость приповерхностного таяния
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - S2End - (S3 - S2) )/sec2years );
-% setupPlot(h, "Average Upper Melting Rate", "mm/year")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% %caxis([0 1500])
-% savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
-% 
-% % Конечная толщина льда
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
-% setupPlot(h, "End Ice Thickness", "m")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% caxis([0 inf])
-% savePlot(h, folderName + "Pics/" + "EndIceThickness");
-% 
-% % Изменение толщины льда с вычетом вклада аккумуляции
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*tEnd - S1End) - (S2 - S1) );
-% setupPlot(h, sprintf("Change in ice thickness\n(no accumulation)"), "m")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% %caxis([0 500])
-% savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
-% 
-% % Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], S2End - AccumRate*tEnd - S2 );
-% setupPlot(h, sprintf("Change in surface elevation\n(no accumulation)"), "m")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% %caxis([0 500])
-% savePlot(h, folderName + "Pics/" + "ChangeInSurfElevation_noAccum");
+fprintf("Getting phase boundaries at t = %.2f years... ", tEnd * sec2years);
+[~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
+fprintf("Done.\n")
+
+% dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
+
+% Скорость донного таяния
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/(tEnd*sec2years) );
+setupPlot(h, "Basal Melting Rate", "mm/year")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+caxis([0 15])
+savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
+
+% Скорость приповерхностного таяния
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - S2End - (S3 - S2) )/sec2years );
+setupPlot(h, "Average Upper Melting Rate", "mm/year")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+%caxis([0 1500])
+savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
+
+% Конечная толщина льда
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
+setupPlot(h, "End Ice Thickness", "m")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+caxis([0 inf])
+savePlot(h, folderName + "Pics/" + "EndIceThickness");
+
+% Изменение толщины льда с вычетом вклада аккумуляции
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*tEnd - S1End) - (S2 - S1) );
+setupPlot(h, sprintf("Change in ice thickness\n(no accumulation)"), "m")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+%caxis([0 500])
+savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
+
+% Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], S2End - AccumRate*tEnd - S2 );
+setupPlot(h, sprintf("Change in surface elevation\n(no accumulation)"), "m")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+%caxis([0 500])
+savePlot(h, folderName + "Pics/" + "ChangeInSurfElevation_noAccum");
 
 % %%% Генерация картинок в разные моменты времени
 % t = 0:100/sec2years:tEnd;
