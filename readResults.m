@@ -1,24 +1,24 @@
-% clear; close all;
-% addpath( genpath('..\ForCoastlinePlotting') );   % Не знаю почему, но здесь одна точка (а не 2) означает подняться на один уровень
-% 
-% folderName = "Results/Four/";
-% initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
-% 
-% sec2years = 1/(3600*24*365.25);
-% 
-% fprintf("\n=============== Read glacier modelling results ===============\n");
-% 
-% if ~exist(folderName + "Pics", 'dir')
-%     mkdir(folderName + "Pics");
-% end
-% 
-% fprintf("Finding last common time moment... ");
-% tEnd = getLastCommonTimeMoment(folderName);
-% fprintf("Done. tEnd = %.6e (%.2f years)\n", tEnd, tEnd * sec2years);
-% 
-% fprintf("Getting phase boundaries at t = 0... ");
-% [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
-% fprintf("Done.\n")
+clear; close all;
+addpath( genpath('..\ForCoastlinePlotting') );   % Не знаю почему, но здесь одна точка (а не 2) означает подняться на один уровень
+
+folderName = "Results/Four/";
+initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
+
+sec2years = 1/(3600*24*365.25);
+
+fprintf("\n=============== Read glacier modelling results ===============\n");
+
+if ~exist(folderName + "Pics", 'dir')
+    mkdir(folderName + "Pics");
+end
+
+fprintf("Finding last common time moment... ");
+tEnd = getLastCommonTimeMoment(folderName);
+fprintf("Done. tEnd = %.6e (%.2f years)\n", tEnd, tEnd * sec2years);
+
+fprintf("Getting phase boundaries at t = 0... ");
+[S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
+fprintf("Done.\n")
 
 % Получение скорости аккумуляции (в м/с)
 AccumRate = getAccumulationSpeed(initDataFilename, folderName, size(S0));
@@ -70,62 +70,62 @@ AccumRate = getAccumulationSpeed(initDataFilename, folderName, size(S0));
 % %caxis([0 500])
 % savePlot(h, folderName + "Pics/" + "ChangeInSurfElevation_noAccum");
 
-%%% Генерация картинок в разные моменты времени
-t = 0:100/sec2years:tEnd;
-if ~exist(folderName + "Pics/Dynamics", 'dir')
-    mkdir(folderName + "Pics/Dynamics");
-end
-if ~exist(folderName + "Pics/Dynamics/BasalMelt", 'dir')
-    mkdir(folderName + "Pics/Dynamics/BasalMelt");
-end
-% if ~exist(folderName + "Pics/Dynamics/IceThickness", 'dir')
-%     mkdir(folderName + "Pics/Dynamics/IceThickness");
+% %%% Генерация картинок в разные моменты времени
+% t = 0:100/sec2years:tEnd;
+% if ~exist(folderName + "Pics/Dynamics", 'dir')
+%     mkdir(folderName + "Pics/Dynamics");
 % end
-if ~exist(folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum", 'dir')
-    mkdir(folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum");
-end
-if ~exist(folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum", 'dir')
-    mkdir(folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum");
-end
-
-figure; ax1 = gca;
-figure; ax2 = gca;
-figure; ax3 = gca;
-figure; ax4 = gca;
-
-for i = 1:length(t)
-    fprintf("Getting phase boundaries at t = %.2f years... ", t(i) * sec2years);
-    [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
-    fprintf("Done.\n")
-    
-    % Донное таяние
-    h1 = imagesc(ax1, [x(1) x(end)], [y(1) y(end)], S1End - S0 );
-    setupPlot(h1, sprintf("Basal melting\nt = %.2f years", t(i)*sec2years), "m")
-    caxis(ax1, [0 15])
-    plotAntarcticCoastLines(h1.Parent, "Color", "k", "LineWidth", 0.5);
-    savePlot(h1, folderName + "Pics/Dynamics/BasalMelt/" + "BasalMelt" + i);
-
-    % Изменение толщины льда с вычетом вклада аккумуляции
-    h2 = imagesc(ax2, [x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*t(i) - S1End) - (S2 - S1) );
-    setupPlot(h2, sprintf("Change in ice thickness, t = %.2f years\n(no accumulation)", t(i)*sec2years), "m")
-    caxis(ax2, [-17 0])
-    plotAntarcticCoastLines(h2.Parent, "Color", "k", "LineWidth", 0.5);
-    savePlot(h2, folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum/" + "ChangeInIceThickness_noAccum" + i);
-    
-%     % Толщина льда
-%     h3 = imagesc(ax3, [x(1) x(end)], [y(1) y(end)], S2End-S1End );
-%     setupPlot(h3, sprintf("End Ice Thickness, t = %.2f years", t(i)*sec2years), "m")
-%     caxis(ax3, [0 5000])
-%     plotAntarcticCoastLines(h3.Parent, "Color", "k", "LineWidth", 0.5);
-%     savePlot(h3, folderName + "Pics/Dynamics/IceThickness/" + "IceThickness" + i);
-    
-    % Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
-    h4 = imagesc(ax4, [x(1) x(end)], [y(1) y(end)], S2End - AccumRate*t(i) - S2 );
-    setupPlot(h4, sprintf("Change in surface elevation, t = %.2f years\n(no accumulation)", t(i)*sec2years), "m")
-    caxis(ax4, [-1.5 0])
-    plotAntarcticCoastLines(h4.Parent, "Color", "k", "LineWidth", 0.5);
-    savePlot(h4, folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum/" + "ChangeInSurfElevation_noAccum" + i);
-end
+% if ~exist(folderName + "Pics/Dynamics/BasalMelt", 'dir')
+%     mkdir(folderName + "Pics/Dynamics/BasalMelt");
+% end
+% % if ~exist(folderName + "Pics/Dynamics/IceThickness", 'dir')
+% %     mkdir(folderName + "Pics/Dynamics/IceThickness");
+% % end
+% if ~exist(folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum", 'dir')
+%     mkdir(folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum");
+% end
+% if ~exist(folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum", 'dir')
+%     mkdir(folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum");
+% end
+% 
+% figure; ax1 = gca;
+% figure; ax2 = gca;
+% figure; ax3 = gca;
+% figure; ax4 = gca;
+% 
+% for i = 1:length(t)
+%     fprintf("Getting phase boundaries at t = %.2f years... ", t(i) * sec2years);
+%     [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
+%     fprintf("Done.\n")
+%     
+%     % Донное таяние
+%     h1 = imagesc(ax1, [x(1) x(end)], [y(1) y(end)], S1End - S0 );
+%     setupPlot(h1, sprintf("Basal melting\nt = %.2f years", t(i)*sec2years), "m")
+%     caxis(ax1, [0 15])
+%     plotAntarcticCoastLines(h1.Parent, "Color", "k", "LineWidth", 0.5);
+%     savePlot(h1, folderName + "Pics/Dynamics/BasalMelt/" + "BasalMelt" + i);
+% 
+%     % Изменение толщины льда с вычетом вклада аккумуляции
+%     h2 = imagesc(ax2, [x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*t(i) - S1End) - (S2 - S1) );
+%     setupPlot(h2, sprintf("Change in ice thickness, t = %.2f years\n(no accumulation)", t(i)*sec2years), "m")
+%     caxis(ax2, [-17 0])
+%     plotAntarcticCoastLines(h2.Parent, "Color", "k", "LineWidth", 0.5);
+%     savePlot(h2, folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum/" + "ChangeInIceThickness_noAccum" + i);
+%     
+% %     % Толщина льда
+% %     h3 = imagesc(ax3, [x(1) x(end)], [y(1) y(end)], S2End-S1End );
+% %     setupPlot(h3, sprintf("End Ice Thickness, t = %.2f years", t(i)*sec2years), "m")
+% %     caxis(ax3, [0 5000])
+% %     plotAntarcticCoastLines(h3.Parent, "Color", "k", "LineWidth", 0.5);
+% %     savePlot(h3, folderName + "Pics/Dynamics/IceThickness/" + "IceThickness" + i);
+%     
+%     % Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
+%     h4 = imagesc(ax4, [x(1) x(end)], [y(1) y(end)], S2End - AccumRate*t(i) - S2 );
+%     setupPlot(h4, sprintf("Change in surface elevation, t = %.2f years\n(no accumulation)", t(i)*sec2years), "m")
+%     caxis(ax4, [-1.5 0])
+%     plotAntarcticCoastLines(h4.Parent, "Color", "k", "LineWidth", 0.5);
+%     savePlot(h4, folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum/" + "ChangeInSurfElevation_noAccum" + i);
+% end
 
 function setupPlot(h, titleName, cbTitleName)
     ax = h.Parent;
