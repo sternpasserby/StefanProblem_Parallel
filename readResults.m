@@ -1,116 +1,162 @@
-clear; close all;
-
-folderName = "Results/Four/";
-initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
-mkdir(folderName + "Pics");
-
-tEnd = getLastCommonTimeMoment(folderName);
-[S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
-[~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
-
-% Получение вклада аккумуляции
-load(initDataFilename, 'Data');
-dAccum = NaN*zeros(size(S0));
-dirInfo = dir(folderName + "/*.bin");
-filename = string( dirInfo(1).name );
-fid = fopen(folderName + filename, "rb");
-N = fread(fid, 1, 'int');
-points_id = fread(fid, [1, N], 'int');
-x = unique(Data.X);
-y = unique(Data.Y);
-rho2 = 916.7;
-for i = 1:N
-    id = points_id(i);
-    i1 = find( y == Data.Y(id) );
-    j1 = find( x == Data.X(id) );
-    
-    dAccum(i1, j1) = Data.AccumRate_kg1m2a1(id)/rho2/(3600*24*365.25)*tEnd;
-end
-fclose(fid);
-
-dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
-
-figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/tEnd*3600*24*365.25 );
-setupPlot(h, "Basal Melting Rate", "mm/year")
-caxis([0 15])
-savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
-
-% vw = VideoWriter('newfile.avi');
-% vw.FrameRate = 1;
-% open(vw)
-% h = imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
-% setupPlot(h, sprintf("S3(t) - S2(t), t  = %d years", 0), "m")
-% axis tight manual 
-% set(gca,'nextplot','replacechildren'); 
-% t = linspace(0, tEnd, 20);
-% pb = ConsoleProgressBar();
-% for i = 1:length(t)
-%     [~, ~, S2, S3, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
-%     imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
-%     title( sprintf( "S3(t) - S2(t), t  = %d years", floor(t(i)/(3600*24*365.25)) ) );
-%     writeVideo(vw, getframe(gcf) );
-%     pb.setProgress( i, length(t) );
+% clear; close all;
+% addpath( genpath('..\ForCoastlinePlotting') );   % Не знаю почему, но здесь одна точка (а не 2) означает подняться на один уровень
+% 
+% folderName = "Results/Four/";
+% initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
+% 
+% sec2years = 1/(3600*24*365.25);
+% 
+% fprintf("\n=============== Read glacier modelling results ===============\n");
+% 
+% if ~exist(folderName + "Pics", 'dir')
+%     mkdir(folderName + "Pics");
 % end
-% close(vw)
+% 
+% fprintf("Finding last common time moment... ");
+% tEnd = getLastCommonTimeMoment(folderName);
+% fprintf("Done. tEnd = %.6e (%.2f years)\n", tEnd, tEnd * sec2years);
+% 
+% fprintf("Getting phase boundaries at t = 0... ");
+% [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
+% fprintf("Done.\n")
 
-figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - dAccum - S3 + dH )/tEnd*3600*24*365.25 );
-setupPlot(h, "Average Upper Melting Rate", "mm/year")
-%caxis([0 1500])
-savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
+% Получение скорости аккумуляции (в м/с)
+AccumRate = getAccumulationSpeed(initDataFilename, folderName, size(S0));
 
-figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
-setupPlot(h, "End Ice Thickness", "m")
-caxis([0 inf])
-savePlot(h, folderName + "Pics/" + "EndIceThickness");
+% 
+% fprintf("Getting phase boundaries at t = %.2f years... ", tEnd * sec2years);
+% [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
+% fprintf("Done.\n")
+% 
+% % dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
+% 
+% % Скорость донного таяния
+% figure
+% h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/(tEnd*sec2years) );
+% setupPlot(h, "Basal Melting Rate", "mm/year")
+% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+% caxis([0 15])
+% savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
+% 
+% % Скорость приповерхностного таяния
+% figure
+% h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - S2End - (S3 - S2) )/sec2years );
+% setupPlot(h, "Average Upper Melting Rate", "mm/year")
+% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+% %caxis([0 1500])
+% savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
+% 
+% % Конечная толщина льда
+% figure
+% h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
+% setupPlot(h, "End Ice Thickness", "m")
+% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+% caxis([0 inf])
+% savePlot(h, folderName + "Pics/" + "EndIceThickness");
+% 
+% % Изменение толщины льда с вычетом вклада аккумуляции
+% figure
+% h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*tEnd - S1End) - (S2 - S1) );
+% setupPlot(h, sprintf("Change in ice thickness\n(no accumulation)"), "m")
+% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+% %caxis([0 500])
+% savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
+% 
+% % Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
+% figure
+% h = imagesc([x(1) x(end)], [y(1) y(end)], S2End - AccumRate*tEnd - S2 );
+% setupPlot(h, sprintf("Change in surface elevation\n(no accumulation)"), "m")
+% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+% %caxis([0 500])
+% savePlot(h, folderName + "Pics/" + "ChangeInSurfElevation_noAccum");
 
-figure
-h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - dAccum - S1End) - (S2 - S1) );
-setupPlot(h, "Change in ice thickness (no accumulation)", "m")
-%caxis([0 500])
-savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
+%%% Генерация картинок в разные моменты времени
+t = 0:100/sec2years:tEnd;
+if ~exist(folderName + "Pics/Dynamics", 'dir')
+    mkdir(folderName + "Pics/Dynamics");
+end
+if ~exist(folderName + "Pics/Dynamics/BasalMelt", 'dir')
+    mkdir(folderName + "Pics/Dynamics/BasalMelt");
+end
+% if ~exist(folderName + "Pics/Dynamics/IceThickness", 'dir')
+%     mkdir(folderName + "Pics/Dynamics/IceThickness");
+% end
+if ~exist(folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum", 'dir')
+    mkdir(folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum");
+end
+if ~exist(folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum", 'dir')
+    mkdir(folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum");
+end
+
+figure; ax1 = gca;
+figure; ax2 = gca;
+figure; ax3 = gca;
+figure; ax4 = gca;
+
+for i = 1:length(t)
+    fprintf("Getting phase boundaries at t = %.2f years... ", t(i) * sec2years);
+    [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
+    fprintf("Done.\n")
+    
+    % Донное таяние
+    h1 = imagesc(ax1, [x(1) x(end)], [y(1) y(end)], S1End - S0 );
+    setupPlot(h1, sprintf("Basal melting\nt = %.2f years", t(i)*sec2years), "m")
+    caxis(ax1, [0 15])
+    plotAntarcticCoastLines(h1.Parent, "Color", "k", "LineWidth", 0.5);
+    savePlot(h1, folderName + "Pics/Dynamics/BasalMelt/" + "BasalMelt" + i);
+
+    % Изменение толщины льда с вычетом вклада аккумуляции
+    h2 = imagesc(ax2, [x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*t(i) - S1End) - (S2 - S1) );
+    setupPlot(h2, sprintf("Change in ice thickness, t = %.2f years\n(no accumulation)", t(i)*sec2years), "m")
+    caxis(ax2, [-17 0])
+    plotAntarcticCoastLines(h2.Parent, "Color", "k", "LineWidth", 0.5);
+    savePlot(h2, folderName + "Pics/Dynamics/ChangeInIceThickness_noAccum/" + "ChangeInIceThickness_noAccum" + i);
+    
+%     % Толщина льда
+%     h3 = imagesc(ax3, [x(1) x(end)], [y(1) y(end)], S2End-S1End );
+%     setupPlot(h3, sprintf("End Ice Thickness, t = %.2f years", t(i)*sec2years), "m")
+%     caxis(ax3, [0 5000])
+%     plotAntarcticCoastLines(h3.Parent, "Color", "k", "LineWidth", 0.5);
+%     savePlot(h3, folderName + "Pics/Dynamics/IceThickness/" + "IceThickness" + i);
+    
+    % Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
+    h4 = imagesc(ax4, [x(1) x(end)], [y(1) y(end)], S2End - AccumRate*t(i) - S2 );
+    setupPlot(h4, sprintf("Change in surface elevation, t = %.2f years\n(no accumulation)", t(i)*sec2years), "m")
+    caxis(ax4, [-1.5 0])
+    plotAntarcticCoastLines(h4.Parent, "Color", "k", "LineWidth", 0.5);
+    savePlot(h4, folderName + "Pics/Dynamics/ChangeInSurfElevation_noAccum/" + "ChangeInSurfElevation_noAccum" + i);
+end
 
 function setupPlot(h, titleName, cbTitleName)
-    colormap jet
-    set(gca ,'YDir','normal') 
+    ax = h.Parent;
+    ax.Colormap = colormap(jet);
+    %colormap jet
+    %ax.YDir = 'normal';
+    set(ax ,'YDir','normal') 
     set(h, 'AlphaData', ~isnan(h.CData))
-    xlabel("X, m");
-    ylabel("Y, m")
-    title(titleName);
-    cb=colorbar; cb.TickLabelInterpreter='latex'; title(cb, cbTitleName)
-    axis equal
+    ax.XLabel.String = "X, m";
+    ax.YLabel.String = "Y, m";
+    ax.Title.String = titleName;
+    cb=colorbar(ax); cb.TickLabelInterpreter='latex'; cb.Title.String = cbTitleName; 
+        cb.Title.Interpreter = "Latex";
+    axis(ax,'equal'); % axis equal
 end
 
 function savePlot(h, filename)
-    savefig(filename)
-    print(filename, '-dpng', '-r300')
+    ax = h.Parent;
+    savefig(ax.Parent, filename)
+    print(ax.Parent, filename, '-dpng', '-r300')
+    print(ax.Parent, filename, '-depsc')
 end
 
 function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, time)
     load(initDataFilename, 'Data');
-    x = unique(Data.X);
-    y = unique(Data.Y);
+    X = Data.X;
+    Y = Data.Y;
+    clear Data;
     
-%     isS0 = false;
-%     isS1 = false;
-%     isS2 = false;
-%     isS3 = false;
-%     for i = 1:length(chosenVarsArray)
-%         if chosenVarsArray(i) == "S0"
-%             isS0 = true;
-%         end
-%         if chosenVarsArray(i) == "S1"
-%             isS1 = true;
-%         end
-%         if chosenVarsArray(i) == "S2"
-%             isS2 = true;
-%         end
-%         if chosenVarsArray(i) == "S3"
-%             isS3 = true;
-%         end
-%     end
+    x = unique(X);
+    y = unique(Y);
     
     numOfRows = length(y);
     numOfCols = length(x);
@@ -145,24 +191,48 @@ function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilena
             end
             L = fread(fid, 1, 'int');
             t = fread(fid, [1, L], 'double');
-            A = fread(fid, [4, L], 'double');
+            
+            % idx - номер интервала на сетке t ( подразумевается нумерация, начинающаяся с единицы)
+            [~, idx] = min( abs(t - time) );
+            %idx = min(idx, L-1);
+            if t(idx) > time
+                idx = idx-1;
+            end
+            if time == t(end)
+                idx = idx-1;
+            end
+            
+            % Далее в файле идёт матрица 4 на L. Строки - координаты границ
+            % s_i в моменты времени, которые хранятся в массиве t
+            fseek(fid, 32*(idx-1), 0);  % 32, потому что 4 элемента в столбце, и каждый занимает 8 байт
+            A = fread(fid, [4, 2], 'double');
+            fseek(fid, 32*( L-idx-1 ), 0);
+            
+            %A = fread(fid, [4, L], 'double');
 
-            i1 = find(y == Data.Y(id));
-            j1 = find(x == Data.X(id));
+            i1 = find(y == Y(id));
+            j1 = find(x == X(id));
             
-            S0(i1, j1) = interp1(t, A(1, :), time);
-            S1(i1, j1) = interp1(t, A(2, :), time);
-            S2(i1, j1) = interp1(t, A(3, :), time);
-            S3(i1, j1) = interp1(t, A(4, :), time);
+            % Линейная интерполяция
+            temp = (time - t(idx)) / ( t(idx+1)-t(idx) );
+            S0(i1, j1) = ( A(1, 2) - A(1, 1) )*temp + A(1, 1);
+            S1(i1, j1) = ( A(2, 2) - A(2, 1) )*temp + A(2, 1);
+            S2(i1, j1) = ( A(3, 2) - A(3, 1) )*temp + A(3, 1);
+            S3(i1, j1) = ( A(4, 2) - A(4, 1) )*temp + A(4, 1);
             
-            %s1End = interp1(t, A(2, :), tVid(k));
-            %image(i1, j1) = s1End - A(2, 1);
+%             S0(i1, j1) = interp1(t(idx:idx+1), A(1, :), time);
+%             S1(i1, j1) = interp1(t(idx:idx+1), A(2, :), time);
+%             S2(i1, j1) = interp1(t(idx:idx+1), A(3, :), time);
+%             S3(i1, j1) = interp1(t(idx:idx+1), A(4, :), time);
             
             readPoints = readPoints + 1;
+            if mod(readPoints, 5000) == 0
+                pb.setProgress( readPoints, N );
+            end
         end
-        pb.setProgress( readPoints, N );
         fclose(fid);
     end
+    delete(pb);
 end
 
 function res = getLastCommonTimeMoment(folderName)
@@ -194,17 +264,46 @@ function res = getLastCommonTimeMoment(folderName)
             end
             L = fread(fid, 1, 'int');
             t = fread(fid, [1, L], 'double');
-            A = fread(fid, [4, L], 'double');
+            fseek(fid, 32*L, 0);
+            %A = fread(fid, [4, L], 'double');*uint8
+            %A = fread(fid, [4, L], 'double');
             
             if t(end) < res
                 res = t(end);
             end
 
             readPoints = readPoints + 1;
+            if mod(readPoints, 5000) == 0
+                pb.setProgress( readPoints, N );
+            end
         end
-        pb.setProgress( readPoints, N );
         fclose(fid);
     end
+end
+
+function AccumRate = getAccumulationSpeed(initDataFilename, folderName, size)
+    AccumRate = NaN*zeros( size );
+    
+    dirInfo = dir(folderName + "/*.bin");
+    filename = string( dirInfo(1).name );
+    fid = fopen(folderName + filename, "rb");
+    N = fread(fid, 1, 'int');
+    points_id = fread(fid, [1, N], 'int');
+    
+    load(initDataFilename, 'Data');
+    x = unique(Data.X);
+    y = unique(Data.Y);
+    rho2 = 916.7;
+    temp = 1/rho2/(3600*24*365.25);
+    for i = 1:N
+        id = points_id(i);
+        i1 = find( y == Data.Y(id) );
+        j1 = find( x == Data.X(id) );
+
+        AccumRate(i1, j1) = Data.AccumRate_kg1m2a1(id)*temp;
+    end
+    fclose(fid);
+    clear Data 
 end
 
 function printArray(A)
@@ -214,3 +313,23 @@ function printArray(A)
         fprintf("\n");
     end
 end
+
+
+
+% vw = VideoWriter('newfile.avi');
+% vw.FrameRate = 1;
+% open(vw)
+% h = imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
+% setupPlot(h, sprintf("S3(t) - S2(t), t  = %d years", 0), "m")
+% axis tight manual 
+% set(gca,'nextplot','replacechildren'); 
+% t = linspace(0, tEnd, 20);
+% pb = ConsoleProgressBar();
+% for i = 1:length(t)
+%     [~, ~, S2, S3, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
+%     imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
+%     title( sprintf( "S3(t) - S2(t), t  = %d years", floor(t(i)/(3600*24*365.25)) ) );
+%     writeVideo(vw, getframe(gcf) );
+%     pb.setProgress( i, length(t) );
+% end
+% close(vw)

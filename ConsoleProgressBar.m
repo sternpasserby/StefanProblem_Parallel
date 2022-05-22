@@ -4,11 +4,16 @@ classdef ConsoleProgressBar < handle
     
     properties (Access = private)
         barLength = 25;
+        
         leftSymbol = '[';
         rightSymbol = ']';
         completedSymbol = '=';
         todoSymbol = ' ';
         reverseStr = '';
+        
+        setProgressExecutedFirstTime = true;
+        startTick = 0;
+        elapsedTime = 0;
     end
     
     methods
@@ -21,7 +26,14 @@ classdef ConsoleProgressBar < handle
         function setProgress(obj, n, N)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
+            if obj.setProgressExecutedFirstTime == true
+                obj.setProgressExecutedFirstTime = false;
+                obj.startTick = tic;
+            end
+            obj.elapsedTime = toc(obj.startTick);
+            
             progressFraction = n/N;
+            
             numOfSegments = floor(progressFraction*obj.barLength);
             completedStr = repmat(obj.completedSymbol, 1, numOfSegments);
             todoStr = repmat(obj.todoSymbol, 1, obj.barLength - numOfSegments);
@@ -30,15 +42,18 @@ classdef ConsoleProgressBar < handle
                 completedStr... 
                 todoStr... 
                 obj.rightSymbol... 
-                ' %5.2f%% (%d/%d)'],... 
-                progressFraction*100, n, N);
+                ' %5.2f%% (%d/%d)\n'...
+                'Elapsed time: %.2f sec\n'...
+                '         ETA: %.2f sec'],... 
+                progressFraction*100, n, N, obj.elapsedTime, obj.elapsedTime*(N/n-1) );
+            
             disp([obj.reverseStr, msg]);
-            obj.reverseStr = repmat(sprintf('\b'), 1, length(msg)+1);
+            obj.reverseStr = repmat(sprintf('\b'), 1, length(msg)+1 );
         end
         
-%         function delete(obj)
-%             disp(obj.reverseStr);
-%         end
+        function delete(obj)
+            fprintf([obj.reverseStr ]);
+        end
     end
 end
 
