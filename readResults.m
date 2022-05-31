@@ -1,8 +1,10 @@
-clear; close all;
-addpath( genpath('..\ForCoastlinePlotting') ); 
+% Скрипт для построения графиков с результатами моделирования Антарктиды
 
-folderName = "Results/Four/";
-initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
+clear; close all;
+addpath( genpath('../ForCoastlinePlotting') );    % Здесь хранятся функции для рисования береговой линии Антарктиды
+
+folderName = "Results/Four/";                     % Папка с результатами моделирования, для которых строить графики
+initDataFilename = '../AntarcticData/2021_03_30 AntarcticaBM2_parsed.mat'; % Исходные данные, по которым производилось моделирование
 
 sec2years = 1/(3600*24*365.25);
 
@@ -12,10 +14,13 @@ if ~exist(folderName + "Pics", 'dir')
     mkdir(folderName + "Pics");
 end
 
+% Получить последний момент времени, который есть у каждой точки грида
+% данных
 fprintf("Finding last common time moment... ");
 tEnd = getLastCommonTimeMoment(folderName);
 fprintf("Done. tEnd = %.6e sec (%.2f years)\n", tEnd, tEnd * sec2years);
 
+% Получить начальное положение границ фаз
 fprintf("Getting phase boundaries at t = 0... ");
 [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, 0);
 fprintf("Done.\n")
@@ -23,55 +28,58 @@ fprintf("Done.\n")
 % Получение скорости аккумуляции (в м/с)
 AccumRate = getAccumulationSpeed(initDataFilename, folderName, size(S0));
 
+% Получение границ фаз в последний момент времени
 fprintf("Getting phase boundaries at t = %.2f years... ", tEnd * sec2years);
 [~, S1End, S2End, S3End, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, tEnd);
 fprintf("Done.\n")
+
+% Посчитать объём растаявшей снизу воды
 dS1 = S1End - S1;
 fprintf("Volume of melted water after %.2f years: %.4e km^3\n", tEnd*sec2years, ...
     100*sum( dS1( ~isnan(dS1) )/1000, 'all') );      % шаг грида данных 10 км, отсюда площадь на точку данных 100 км2
 fprintf("Number of glacier points: %d\n", numel( S0( ~isnan(S0) ) ) );
 
-% dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
+dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
 
-% % Скорость донного таяния
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/(tEnd*sec2years) );
-% setupPlot(h, "Basal Melting Rate", "mm/year")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% caxis([0 15])
-% savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
-% 
-% % Скорость приповерхностного таяния
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - S2End - (S3 - S2) )/sec2years );
-% setupPlot(h, "Average Upper Melting Rate", "mm/year")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% %caxis([0 1500])
-% savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
-% 
-% % Конечная толщина льда
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
-% setupPlot(h, "End Ice Thickness", "m")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% caxis([0 inf])
-% savePlot(h, folderName + "Pics/" + "EndIceThickness");
-% 
-% % Изменение толщины льда с вычетом вклада аккумуляции
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*tEnd - S1End) - (S2 - S1) );
-% setupPlot(h, sprintf("Change in ice thickness\n(no accumulation)"), "m")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% %caxis([0 500])
-% savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
-% 
-% % Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
-% figure
-% h = imagesc([x(1) x(end)], [y(1) y(end)], S2End - AccumRate*tEnd - S2 );
-% setupPlot(h, sprintf("Change in surface elevation\n(no accumulation)"), "m")
-% plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
-% %caxis([0 500])
-% savePlot(h, folderName + "Pics/" + "ChangeInSurfElevation_noAccum");
+% Скорость донного таяния
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*(S1End - S0)/(tEnd*sec2years) );
+setupPlot(h, "Basal Melting Rate", "mm/year")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+caxis([0 15])
+savePlot(h, folderName + "Pics/" + "BasalMeltingRate");
+
+% Скорость приповерхностного таяния
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], 1000*( S3End - S2End - (S3 - S2) )/sec2years );
+setupPlot(h, "Average Upper Melting Rate", "mm/year")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+%caxis([0 1500])
+savePlot(h, folderName + "Pics/" + "AverageUpperMeltingRate");
+
+% Конечная толщина льда
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], S2End-S1End );
+setupPlot(h, "End Ice Thickness", "m")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+caxis([0 inf])
+savePlot(h, folderName + "Pics/" + "EndIceThickness");
+
+% Изменение толщины льда с вычетом вклада аккумуляции
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], (S2End - AccumRate*tEnd - S1End) - (S2 - S1) );
+setupPlot(h, sprintf("Change in ice thickness\n(no accumulation)"), "m")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+%caxis([0 500])
+savePlot(h, folderName + "Pics/" + "ChangeInIceThickness_noAccum");
+
+% Изменения координаты верхней кромки ледника с вычетом вклада аккумуляции
+figure
+h = imagesc([x(1) x(end)], [y(1) y(end)], S2End - AccumRate*tEnd - S2 );
+setupPlot(h, sprintf("Change in surface elevation\n(no accumulation)"), "m")
+plotAntarcticCoastLines(h.Parent, "Color", "k", "LineWidth", 0.5);
+%caxis([0 500])
+savePlot(h, folderName + "Pics/" + "ChangeInSurfElevation_noAccum");
 
 %%% Генерация картинок в разные моменты времени
 t = 0:250/sec2years:tEnd; t(1) = [];
@@ -138,6 +146,10 @@ end
 % ax.XLabel.String = "Time, years";
 % ax.YLabel.String = "V of melted water under ice, $km^3$";
 
+% Настройка осей координат. 
+%   ax - ссылка на объект графика
+%   titleName - что написать в качестве заголовка 
+%   cbTitleName - заголовок colorbar'а
 function setupPlot(h, titleName, cbTitleName)
     ax = h.Parent;
     ax.Colormap = colormap(jet);
@@ -153,6 +165,9 @@ function setupPlot(h, titleName, cbTitleName)
     axis(ax,'equal'); % axis equal
 end
 
+% Сохранения графика в трёх форматах: png, eps и исходный матлабовский fig
+%   h - ссылка на объект осей координат (Axes)
+%   filename - имя файла без расширения
 function savePlot(h, filename)
     ax = h.Parent;
     savefig(ax.Parent, filename)
@@ -160,6 +175,7 @@ function savePlot(h, filename)
     print(ax.Parent, filename, '-depsc')
 end
 
+% Получить границы фазовых переходов в момент времени time
 function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, time)
     load(initDataFilename, 'Data');
     X = Data.X;
@@ -246,6 +262,8 @@ function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilena
     delete(pb);
 end
 
+% Получить последний момент времени, которые есть в моделировании для
+% каждой точки ледника
 function res = getLastCommonTimeMoment(folderName)
 
     % Получение информации о томах
@@ -292,6 +310,7 @@ function res = getLastCommonTimeMoment(folderName)
     end
 end
 
+% Получить скорость аккумуляци в двумерном формате
 function AccumRate = getAccumulationSpeed(initDataFilename, folderName, size)
     AccumRate = NaN*zeros( size );
     
@@ -316,31 +335,3 @@ function AccumRate = getAccumulationSpeed(initDataFilename, folderName, size)
     fclose(fid);
     clear Data 
 end
-
-function printArray(A)
-    [numOfLines, ~] = size(A);
-    for i = 1:numOfLines
-        fprintf("%.4e ", A(i, :));
-        fprintf("\n");
-    end
-end
-
-
-
-% vw = VideoWriter('newfile.avi');
-% vw.FrameRate = 1;
-% open(vw)
-% h = imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
-% setupPlot(h, sprintf("S3(t) - S2(t), t  = %d years", 0), "m")
-% axis tight manual 
-% set(gca,'nextplot','replacechildren'); 
-% t = linspace(0, tEnd, 20);
-% pb = ConsoleProgressBar();
-% for i = 1:length(t)
-%     [~, ~, S2, S3, ~, ~] = getPhaseCoordinates(folderName, initDataFilename, t(i));
-%     imagesc([x(1) x(end)], [y(1) y(end)], S3-S2 );
-%     title( sprintf( "S3(t) - S2(t), t  = %d years", floor(t(i)/(3600*24*365.25)) ) );
-%     writeVideo(vw, getframe(gcf) );
-%     pb.setProgress( i, length(t) );
-% end
-% close(vw)
