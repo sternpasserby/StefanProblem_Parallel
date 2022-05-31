@@ -51,9 +51,9 @@ classdef ConsoleProgressBar < handle
             obj.reverseStr = repmat(sprintf('\b'), 1, length(msg)+1 );
         end
         
-        function delete(obj)
-            fprintf([obj.reverseStr ]);
-        end
+%         function delete(obj)
+%             fprintf([obj.reverseStr ]);
+%         end
     end
 end
 

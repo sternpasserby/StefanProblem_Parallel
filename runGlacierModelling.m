@@ -1,6 +1,14 @@
 function runGlacierModelling(pool, resFolderPath, initDataFilename, points_id, varargin)
-%RUNGLACIERMODELLING Summary of this function goes here
-%   Detailed explanation goes here
+% RUNGLACIERMODELLING Запуск параллельного расчёта для всей Антарктиды с
+% использованием трёхфазной задачи Стефана задачи Стефана
+% 
+% Входные параметры:
+%             pool - ссылка на объект с пулом воркеров
+%    resFolderPath - папка, куда складывать результаты
+% initDataFilename - файл, откуда брать начальные данные
+%        points_id - массив с индексами точек, для которых произвести расчёт
+%         varargin - все остальные параметры, которые потом передаются в решатель
+%                    трёхфазной задачи Стефана StefanProblemSolver
 
 %%% ПАРСИНГ ВХОДНЫХ ПАРАМЕТРОВ
 % Задание значений входных параметров по умолчанию
@@ -122,7 +130,7 @@ if numOfPoints == 0
     return;
 end
 
-load(initDataFilename, 'Data');
+Data = load(initDataFilename);
 batchSize = pool.NumWorkers;
 
 pc = getPhysicalConstants();
@@ -159,12 +167,12 @@ for i = 1:batchSize
     k = points_id(i);
 
     % Граничные условия
-    bc.g0 = @(t)(Data.GHF_Martos_mWm2(k)/1000);
-    bc.g1 = @(t)( Data.T_Average_C(k) + 0.082/(10*365.25*24*3600)*t + Data.dT_Average_C(k)*sin(2*pi*t/31556952) + 273.15);
+    bc.g0 = @(t)(Data.GHF_Martos(k)/1000);
+    bc.g1 = @(t)( Data.Tmean(k) + 0.082/(10*365.25*24*3600)*t + Data.dT(k)*sin(2*pi*t/31556952) + 273.15);
     %F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
     
     % Начальные условия
-    s = [ Data.Bedrock_m(k); Data.Surface_m(k) - Data.IceThickness_m(k); Data.Surface_m(k); Data.Surface_m(k) ];
+    s = [ Data.Bedrock(k); Data.Surface(k) - Data.IceThickness(k); Data.Surface(k); Data.Surface(k) ];
     x2 = linspace(s(2), s(3), Np(2));
     Uf_adj = (273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) ));
     u2 = linspace(Uf_adj, bc.g1(0), Np(2));
@@ -185,7 +193,7 @@ for i = 1:batchSize
                                               'Np', Np,...
                                               'gridType', gridType, ...
                                               'NpSave', NpSave, ...
-                                              'accumRate', Data.AccumRate_kg1m2a1(k), ...
+                                              'accumRate', Data.AccumRate(k), ...
                                               'NpBoundsSave', NpBoundsSave);
     taskInd2pInd(i) = k;
 end
@@ -227,12 +235,12 @@ for i = batchSize+1:numOfPoints + batchSize
         k = points_id(i);
         
         % Граничные условия
-        bc.g0 = @(t)(Data.GHF_Martos_mWm2(k)/1000);
-        bc.g1 = @(t)( Data.T_Average_C(k) + 0.082/(10*365.25*24*3600)*t + Data.dT_Average_C(k)*sin(2*pi*t/31556952) + 273.15);
+        bc.g0 = @(t)(Data.GHF_Martos(k)/1000);
+        bc.g1 = @(t)( Data.Tmean(k) + 0.082/(10*365.25*24*3600)*t + Data.dT(k)*sin(2*pi*t/31556952) + 273.15);
         %F(i) = parfeval(pool, @StefanProblemSolver, 2, pc, bc, ic, 0.25, tau, tMax, 100, tauSave);
         
         % Начальные условия
-        s = [ Data.Bedrock_m(k); Data.Surface_m(k) - Data.IceThickness_m(k); Data.Surface_m(k); Data.Surface_m(k) ];
+        s = [ Data.Bedrock(k); Data.Surface(k) - Data.IceThickness(k); Data.Surface(k); Data.Surface(k) ];
         x2 = linspace(s(2), s(3), Np(2));
         Uf_adj = (273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) ));
         u2 = linspace(Uf_adj, bc.g1(0), Np(2));
@@ -253,7 +261,7 @@ for i = batchSize+1:numOfPoints + batchSize
                                                   'Np', Np,...
                                                   'gridType', gridType, ...
                                                   'NpSave', NpSave, ...
-                                                  'accumRate', Data.AccumRate_kg1m2a1(k), ...
+                                                  'accumRate', Data.AccumRate(k), ...
                                                   'NpBoundsSave', NpBoundsSave);
         taskInd2pInd(taskInd) = k;
     end

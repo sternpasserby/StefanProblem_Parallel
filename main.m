@@ -1,6 +1,9 @@
+% Скрипт для запуска параллельных расчётов для Антарктиды с использованием
+% трёхфазной задачи Стефана.
+
 clear;
 
-initDataFilename = '2021_03_30 AntarcticaBM2_parsed.mat';
+initDataFilename = '../AntarcticData/2021_03_30 AntarcticaBM2_parsed.mat';
 Np = [500 5000 500];
 NpSave = [100 1000 100];
 tMax = 1000*365.25*24*3600;
@@ -13,7 +16,12 @@ if isempty(pool)
     pool = parpool(3);
 end
 
-mex -largeArrayDims mex_TDMA.cpp
+% Если нет скомпилированного mex-файла, скомпилировать
+if ~(isfile("mex_TDMA.mexw64") || isfile("mex_TDMA.mexa64"))
+    mex -largeArrayDims mex_TDMA.cpp
+end
+
+% Присоединить mex файл к пулу воркеров, на всякий случай
 if isfile("mex_TDMA.mexw64")
     addAttachedFiles(pool, "mex_TDMA.mexw64");
 elseif isfile("mex_TDMA.mexa64")
@@ -22,28 +30,29 @@ else
     error("Can't find compiled mex file!");
 end
     
-load(initDataFilename, 'Data');
+Data = load(initDataFilename);
+
+% Выбор точек грида данных, для которых будет проводится расчёт
 points_id = [];
 for i = 1:length(Data.X)
-   if Data.Y(i) ~= -3000
-       continue
-   end
+    
+    %%% Первичное отсеивание, нужно для дебага. При настоящем расчёте эти
+    %%% два оператора if надо закомментировать
+    % Отсеять все точки кроме тех, у которых координата Y = -3000
+    if Data.Y(i) ~= -3000
+        continue
+    end
+    
+    % Брать каждую тридцатую точку из отсеянных до этого момента
     if mod(i, 30) ~= 0
         continue
     end
     
-    bedrock = Data.Bedrock_m(i);
-    iceSurf = Data.Surface_m(i);
-    iceThickness = Data.IceThickness_m(i);
-    %GHF = Data.GHF_Martos_mWm2(i);
-    %accumRate = Data.AccumRate_kg1m2a1(i);
-    
-%     if bedrock > 0 && (iceSurf - iceThickness ~= bedrock) % величины должны быть целыми, так что можно не исхищряться 
-%         continue;
-%     end
-%     if bedrock < 0 && iceSurf - iceThickness > 0
-%         continue;
-%     end
+    %%% Отсеивание всех точек, у которых между нижней кромкой льда и горной
+    %%% породой есть пространство, и точек с нулевой толщиной льда
+    bedrock = Data.Bedrock(i);
+    iceSurf = Data.Surface(i);
+    iceThickness = Data.IceThickness(i);
     if (iceSurf - iceThickness - bedrock ~= 0)
         continue
     end
@@ -53,10 +62,9 @@ for i = 1:length(Data.X)
     points_id(end+1) = i;
 end
 
-%parentDir = "Results\\" + datestr(now, 'yy_mm_dd-HHMMSS') + "\\";
-parentDir = "Results/";
+parentDir = "Results/";     % Папка, куда будут складываться папки с результатами расчётов
 mkdir(parentDir);
-resFolderName = "Three";
+resFolderName = "Five111";    % Имя папки для результатов расчёта
 runGlacierModelling(pool, parentDir + resFolderName, initDataFilename, points_id, ...
     'tau', tau, ...
     'tauSave', tauSave, ...
