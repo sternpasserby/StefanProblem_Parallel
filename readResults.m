@@ -39,6 +39,7 @@ fprintf("Volume of melted water after %.2f years: %.4e km^3\n", tEnd*sec2years, 
     100*sum( dS1( ~isnan(dS1) )/1000, 'all') );      % шаг грида данных 10 км, отсюда площадь на точку данных 100 км2
 fprintf("Number of glacier points: %d\n", numel( S0( ~isnan(S0) ) ) );
 
+rho2 = 916.7;
 dH = (S1End - S0)*(1000/rho2-1);    % Вклад проседания
 
 % Скорость донного таяния
@@ -177,7 +178,7 @@ end
 
 % Получить границы фазовых переходов в момент времени time
 function [S0, S1, S2, S3, x, y] = getPhaseCoordinates(folderName, initDataFilename, time)
-    load(initDataFilename, 'Data');
+    Data = load(initDataFilename);
     X = Data.X;
     Y = Data.Y;
     clear Data;
@@ -320,7 +321,7 @@ function AccumRate = getAccumulationSpeed(initDataFilename, folderName, size)
     N = fread(fid, 1, 'int');
     points_id = fread(fid, [1, N], 'int');
     
-    load(initDataFilename, 'Data');
+    Data = load(initDataFilename);
     x = unique(Data.X);
     y = unique(Data.Y);
     rho2 = 916.7;
@@ -330,7 +331,7 @@ function AccumRate = getAccumulationSpeed(initDataFilename, folderName, size)
         i1 = find( y == Data.Y(id) );
         j1 = find( x == Data.X(id) );
 
-        AccumRate(i1, j1) = Data.AccumRate_kg1m2a1(id)*temp;
+        AccumRate(i1, j1) = Data.AccumRate(id)*temp;
     end
     fclose(fid);
     clear Data 
